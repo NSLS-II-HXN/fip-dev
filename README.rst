@@ -1,4 +1,4 @@
-FIP Microscope - Startup code
+FIP Microscope - Startup Code
 =============================
 
 The repository contains startup code related to the development of the new FIP endstation.
