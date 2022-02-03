@@ -133,3 +133,13 @@ dmypy.json
 
 #VSCode
 .vscode/
+
+# ipython profile stuff
+db
+log
+pid
+security
+#history*.sqlite*
+*.sqlite*
+profile_default
+
