@@ -385,7 +385,7 @@ class SRXFlyer1Axis(Device):
             desc["it"] = spec
             desc["it"]["source"] = self._sis.mca4.pvname
 
-        return {"stream0": desc}
+        return {"primary": desc}
 
     def kickoff(self, *, xstart, xstop, xnum, dwell):
         dets_by_name = {d.name: d for d in self.detectors}
@@ -462,23 +462,23 @@ class SRXFlyer1Axis(Device):
 
         amk_debug_flag = False
 
-        print(f"Complete 1") 
+        print(f"Complete 1")
         # Our acquisition complete PV is: XF:05IDD-ES:1{Dev:Zebra1}:ARRAY_ACQ
         while self._encoder.pc.data_in_progress.get() == 1:
             ttime.sleep(0.01)
-        print(f"Complete 2") 
+        print(f"Complete 2")
         # ttime.sleep(.1)
         self._mode = "complete"
         self._encoder.pc.block_state_reset.put(1)
         # see triggering errors of the xspress3 on suspension.  This is
         # to test the reset of the xspress3 after a line.
 
-        print(f"Complete 3") 
+        print(f"Complete 3")
 
         for d in self._dets:
             d.stop(success=True)
 
-        print(f"Complete 4") 
+        print(f"Complete 4")
 
         self.__filename = "{}.h5".format(uuid.uuid4())
         self.__filename_sis = "{}.h5".format(uuid.uuid4())
