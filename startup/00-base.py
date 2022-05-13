@@ -19,11 +19,11 @@ class SRXPrompt(Prompts):
 
 ip = get_ipython()
 
-# from databroker.v0 import Broker
-# db = Broker.named("hxn")
-# nslsii.configure_base(ip.user_ns, db)
+from databroker.v0 import Broker
+db = Broker.named("hxn")
+nslsii.configure_base(ip.user_ns, db)
 
-nslsii.configure_base(ip.user_ns, "hxn")
+# nslsii.configure_base(ip.user_ns, "hxn")
 
 ip.log.setLevel('WARNING')
 
