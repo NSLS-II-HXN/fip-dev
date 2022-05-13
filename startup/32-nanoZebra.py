@@ -13,7 +13,7 @@ from hxntools.detectors.zebra import Zebra, EpicsSignalWithRBV
 from databroker.assets.handlers import HandlerBase
 
 xs = None  # No Xspress3
-sclr1 = None  # No ion chamber
+use_sclr1 = False  # Set this False to run ano zebra without 'sclr1'
 
 # class CurrentPreampZebra(Device):
 #     ch0 = Cpt(EpicsSignalRO, "Cur:I0-I")
@@ -205,10 +205,14 @@ class SRXZebra(Zebra):
 # zebra.read_attrs = ["pc.data.enc1", "pc.data.enc2", "pc.data.time"]
 
 # LARGE_FILE_DIRECTORY_PATH = "/nsls2/data/srx/assets/zebra/2021/2021-3/"
-LARGE_FILE_DIRECTORY_PATH = "/tmp/collected_data"
+# LARGE_FILE_DIRECTORY_PATH = "/tmp/collected_data"
 
-import os
-os.makedirs(LARGE_FILE_DIRECTORY_PATH, exist_ok=True)  # This should not be done in production
+from datetime import datetime
+LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
+
+
+# import os
+# os.makedirs(LARGE_FILE_DIRECTORY_PATH, exist_ok=True)  # This should not be done in production
 
 
 class SRXFlyer1Axis(Device):
@@ -458,17 +462,23 @@ class SRXFlyer1Axis(Device):
 
         amk_debug_flag = False
 
+        print(f"Complete 1") 
         # Our acquisition complete PV is: XF:05IDD-ES:1{Dev:Zebra1}:ARRAY_ACQ
         while self._encoder.pc.data_in_progress.get() == 1:
             ttime.sleep(0.01)
+        print(f"Complete 2") 
         # ttime.sleep(.1)
         self._mode = "complete"
         self._encoder.pc.block_state_reset.put(1)
         # see triggering errors of the xspress3 on suspension.  This is
         # to test the reset of the xspress3 after a line.
 
+        print(f"Complete 3") 
+
         for d in self._dets:
             d.stop(success=True)
+
+        print(f"Complete 4") 
 
         self.__filename = "{}.h5".format(uuid.uuid4())
         self.__filename_sis = "{}.h5".format(uuid.uuid4())
@@ -662,7 +672,7 @@ try:
         read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.enc3", "pc.data.time"],
     )
     nano_flying_zebra = SRXFlyer1Axis(
-        list(xs for xs in [xs] if xs is not None), sclr1, nanoZebra, name="nano_flying_zebra"
+        list(xs for xs in [xs] if xs is not None), sclr1 if use_sclr1 else None, nanoZebra, name="nano_flying_zebra"
     )
     # print('huge success!')
 except Exception as ex:
