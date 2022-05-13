@@ -18,7 +18,7 @@ class SRXPrompt(Prompts):
         ]
 
 ip = get_ipython()
-nslsii.configure_base(ip.user_ns, "temp")
+nslsii.configure_base(ip.user_ns, "hxn")
 ip.log.setLevel('WARNING')
 
 # nslsii.configure_olog(ip.user_ns)
