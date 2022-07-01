@@ -20,6 +20,8 @@ from bluesky.plan_stubs import (one_1d_step, kickoff, collect,
 from bluesky.plans import (scan, )
 from bluesky.callbacks import CallbackBase, LiveGrid
 
+from bluesky import Msg
+
 from hxntools.handlers import register
 
 from bluesky.utils import short_uid
@@ -152,6 +154,10 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # Run a peakup before the map?
     if (align):
         yield from peakup_fine(shutter=shutter)
+
+    # This is added for consistency with existing HXN plans. Requires custom
+    #   setup of RE:   hxntools.scans.setup(RE=RE)
+    yield Msg('hxn_next_scan_id')
 
     if "scan" not in md:
         md["scan"] = {}
@@ -460,10 +466,10 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             ystep = ystep + 1
 
         # TODO this should be taken care of by stage sigs
-        ion = flying_zebra.sclr
-        if ion:
-            yield from bps.mov(xs.external_trig, False,
-                               ion.count_mode, 1)
+        # ion = flying_zebra.sclr
+        # if ion:
+        #     yield from bps.mov(xs.external_trig, False,
+        #                        ion.count_mode, 1)
         yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
         yield from bps.sleep(2)
 
