@@ -157,7 +157,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     # This is added for consistency with existing HXN plans. Requires custom
     #   setup of RE:   hxntools.scans.setup(RE=RE)
-    yield Msg('hxn_next_scan_id')
+    # yield Msg('hxn_next_scan_id')
 
     if "scan" not in md:
         md["scan"] = {}
