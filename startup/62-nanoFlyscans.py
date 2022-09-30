@@ -136,7 +136,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     # If delta is None, set delta based on time for acceleration
     if delta is None:
-        MIN_DELTA = 0.100  # old default value
+        MIN_DELTA = 0.5  # old default value
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
         t_acc = xmotor.acceleration.get()  # acceleration time
         delta = 0.5 * t_acc * v  # distance the stage will travel in t_acc
@@ -146,8 +146,10 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # Move to start scanning location
     # Calculate move to scan start
     pxsize = (xstop - xstart) / (xnum - 1)
-    row_start = xstart - delta - (pxsize / 2)
-    row_stop = xstop + delta + (pxsize / 2)
+    # row_start = xstart - delta - (pxsize / 2)
+    # row_stop = xstop + delta + (pxsize / 2)
+    row_start = xstart - delta - max(pxsize, 1)
+    row_stop = xstop + delta + max(pxsize, 1)
     # yield from mv(xmotor, row_start,
     #               ymotor, ystart)
 
@@ -178,6 +180,11 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     md['scan']['snake'] = snake
     md['scan']['shape'] = (xnum, ynum)
 
+    # Synchronize encoders
+    flying_zebra._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
+    flying_zebra._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
+    flying_zebra._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
+    yield from bps.sleep(1)
 
     @stage_decorator(flying_zebra.detectors)
     def fly_each_step(motor, step, row_start, row_stop):
@@ -227,6 +234,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # Set the scan speed
         # Is abs_set(wait=True) or mv() faster?
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
+        print(f"Forward speed for the fast axis: {v}")
         # yield from abs_set(xmotor.velocity, v, wait=True)  # set the "stage speed"
         # if (v > xmotor.velocity.high_limit):
         #     raise ValueError(f'Desired motor velocity too high\nMax velocity: {xmotor.velocity.high_limit}')
@@ -283,6 +291,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 yield from kickoff(flying_zebra,
                                    xstart=stop_zebra, xstop=start_zebra, xnum=xnum, dwell=dwell,
                                    wait=True)
+            # yield from bps.sleep(0.1)
+
         if verbose:
             t_zebkickoff = tic()
         yield from zebra_kickoff()
@@ -470,8 +480,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # if ion:
         #     yield from bps.mov(xs.external_trig, False,
         #                        ion.count_mode, 1)
-        yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-        yield from bps.sleep(2)
+        
+        # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
+        # yield from bps.sleep(2)
 
     # toc(t_setup, str='Setup time')
 
@@ -516,8 +527,16 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
-    yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-    yield from bps.sleep(2)
+    # yield from bps.sleep(1)
+    set_scanner_velocity(30)
+    # yield from bps.sleep(1)
+    # print("Centering X-axis ...")
+    # yield from mv(nano_stage.sx, 0)
+    # print("Centering Y-axis ...")
+    # yield from mv(nano_stage.sy, 0)
+    # print("Centering Z-axis ...")
+    # yield from mv(nano_stage.sz, 0)
+    # yield from bps.sleep(2)
 
 
 def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):

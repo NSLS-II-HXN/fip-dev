@@ -390,6 +390,8 @@ class SRXFlyer1Axis(Device):
         return {"primary": desc}
 
     def kickoff(self, *, xstart, xstop, xnum, dwell):
+        print(f"Kickoff: xstart={xstart} xtop={xstop} dwell={dwell}")
+
         dets_by_name = {d.name: d for d in self.detectors}
 
         ## TODO: Need to make sure zebra is full setup for scan
@@ -414,13 +416,15 @@ class SRXFlyer1Axis(Device):
             # print('Changing the pulse width')
             decrement = 1e-5
         self._encoder.pc.gate_start.put(xstart - direction * (pxsize / 2))
-        self._encoder.pc.gate_step.put(extent + 0.051)
+        # self._encoder.pc.gate_step.put(extent + 0.051)
+        self._encoder.pc.gate_step.put(extent + 0.060)
         self._encoder.pc.gate_width.put(extent + 0.050)
 
         self._encoder.pc.pulse_start.put(0.0)
         self._encoder.pc.pulse_max.put(xnum)
         self._encoder.pc.pulse_step.put(pxsize)
-        self._encoder.pc.pulse_width.put(pxsize - decrement)
+        # self._encoder.pc.pulse_width.put(pxsize - decrement)
+        self._encoder.pc.pulse_width.put(pxsize * 0.9)
         # If decrement is too small, then zebra will not send individual pulses
         # but integrate over the entire line
         # Hopefully taken care of with decrement check above
@@ -442,9 +446,10 @@ class SRXFlyer1Axis(Device):
         # self._encoder.pulse3.input_addr.put(31)
         # self._encoder.pulse4.input_addr.put(31)
 
-        self._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
-        self._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
-        self._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
+        # print("Synchronizing stage ...")
+        # self._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
+        # self._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
+        # self._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
         # self._encoder.pc.enc_pos4_sync.put(1)  # None
 
         # Arm the zebra
@@ -737,9 +742,13 @@ def export_nano_zebra_data(zebra, filepath, fastaxis):
     pxsize = zebra.pc.pulse_step.get()  # Pixel size
     encoder = zebra.pc.enc.get(as_string=True)  # Encoder ('Enc1', 'Enc2' or 'Enc3')
 
+    print(f"Loading from Zebra: time")
     time_d = zebra.pc.data.time.get()
+    print(f"Loading from Zebra: enc1")
     enc1_d = zebra.pc.data.enc1.get()
+    print(f"Loading from Zebra: enc2")
     enc2_d = zebra.pc.data.enc2.get()
+    print(f"Loading from Zebra: enc3")
     enc3_d = zebra.pc.data.enc3.get()
 
     # Correction for the encoder values so that they represent the centers of the bins
