@@ -212,7 +212,8 @@ class SRXZebra(Zebra):
 # LARGE_FILE_DIRECTORY_PATH = "/tmp/collected_data"
 
 from datetime import datetime
-LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
+# LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
+LARGE_FILE_DIRECTORY_PATH = "/data/fip-data-test" + datetime.now().strftime("/%Y/%m/%d")
 
 
 # import os
