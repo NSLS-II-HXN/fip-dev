@@ -211,11 +211,6 @@ class SRXZebra(Zebra):
 # LARGE_FILE_DIRECTORY_PATH = "/nsls2/data/srx/assets/zebra/2021/2021-3/"
 # LARGE_FILE_DIRECTORY_PATH = "/tmp/collected_data"
 
-from datetime import datetime
-# LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
-LARGE_FILE_DIRECTORY_PATH = "/data/fip-data-test" + datetime.now().strftime("/%Y/%m/%d")
-
-
 # import os
 # os.makedirs(LARGE_FILE_DIRECTORY_PATH, exist_ok=True)  # This should not be done in production
 
@@ -226,6 +221,7 @@ class SRXFlyer1Axis(Device):
     """
     LARGE_FILE_DIRECTORY_WRITE_PATH = LARGE_FILE_DIRECTORY_PATH
     LARGE_FILE_DIRECTORY_READ_PATH = LARGE_FILE_DIRECTORY_PATH
+    LARGE_FILE_DIRECTORY_ROOT = LARGE_FILE_DIRECTORY_ROOT
     KNOWN_DETS = {"xs", "xs2", "merlin", "dexela"}
     fast_axis = Cpt(Signal, value="HOR", kind="config")
     slow_axis = Cpt(Signal, value="VER", kind="config")
@@ -512,14 +508,14 @@ class SRXFlyer1Axis(Device):
 
         self.__filestore_resource, datum_factory_z = resource_factory(
             "ZEBRA_HDF51",
-            root="/",
+            root=self.LARGE_FILE_DIRECTORY_ROOT,
             resource_path=self.__read_filepath,
             resource_kwargs={},
             path_semantics="posix",
         )
         self.__filestore_resource_sis, datum_factory_sis = resource_factory(
             "SIS_HDF51",
-            root="/",
+            root=self.LARGE_FILE_DIRECTORY_ROOT,
             resource_path=self.__read_filepath_sis,
             resource_kwargs={},
             path_semantics="posix",

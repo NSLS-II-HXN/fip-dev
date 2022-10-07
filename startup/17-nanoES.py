@@ -43,3 +43,8 @@ def reset_scanner_velocity():
     for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
         d.velocity.set(300)
 
+
+from datetime import datetime
+# LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
+LARGE_FILE_DIRECTORY_ROOT = "/data/fip-data-test"
+LARGE_FILE_DIRECTORY_PATH = "/data/fip-data-test" + datetime.now().strftime("/%Y/%m/%d")
