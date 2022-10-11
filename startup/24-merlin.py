@@ -17,7 +17,7 @@ class HxnMerlinDetector(_HMD):
     hdf5 = Cpt(_mhdf, 'HDF1:',
                read_attrs=[],
                configuration_attrs=[],
-               write_path_template=LARGE_FILE_DIRECTORY_WRITE_PATH,
+               write_path_template=LARGE_FILE_DIRECTORY_PATH,
                root=LARGE_FILE_DIRECTORY_ROOT,
                reg=db.reg)
 
@@ -26,3 +26,5 @@ merlin2 = HxnMerlinDetector('XF:03IDC-ES{Merlin:2}', name='merlin2',
                             image_name='merlin2',
                             read_attrs=['hdf5', 'cam', 'stats1'])
 merlin2.hdf5.read_attrs = []
+
+merlin = merlin2
