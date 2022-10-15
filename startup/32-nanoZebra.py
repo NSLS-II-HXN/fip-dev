@@ -222,7 +222,7 @@ class SRXFlyer1Axis(Device):
     LARGE_FILE_DIRECTORY_WRITE_PATH = LARGE_FILE_DIRECTORY_PATH
     LARGE_FILE_DIRECTORY_READ_PATH = LARGE_FILE_DIRECTORY_PATH
     LARGE_FILE_DIRECTORY_ROOT = LARGE_FILE_DIRECTORY_ROOT
-    KNOWN_DETS = {"xs", "xs2", "merlin", "dexela"}
+    KNOWN_DETS = {"xs", "xs2", "merlin2", "dexela"}
     fast_axis = Cpt(Signal, value="HOR", kind="config")
     slow_axis = Cpt(Signal, value="VER", kind="config")
 
@@ -292,8 +292,10 @@ class SRXFlyer1Axis(Device):
         # # PC gate output is 31 for zebra. Use it to trigger xspress3 and I0
         # self.stage_sigs[self._encoder.output1.ttl.addr] = 31
         # self.stage_sigs[self._encoder.output3.ttl.addr] = 31
-        # # This is for the merlin
+
+        # This is for the merlin
         # self.stage_sigs[self._encoder.output2.ttl.addr] = 31
+
         # # self.stage_sigs[self._encoder.output2.ttl.addr] = 53
         # # This is for the dexela
         # self.stage_sigs[self._encoder.output4.ttl.addr] = 31

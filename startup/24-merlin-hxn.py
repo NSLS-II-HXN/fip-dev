@@ -27,4 +27,4 @@ merlin2 = HxnMerlinDetector('XF:03IDC-ES{Merlin:2}', name='merlin2',
                             read_attrs=['hdf5', 'cam', 'stats1'])
 merlin2.hdf5.read_attrs = []
 
-merlin = merlin2
+# merlin = merlin2
