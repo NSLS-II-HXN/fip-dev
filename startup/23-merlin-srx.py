@@ -5,6 +5,7 @@ import itertools
 import sys
 import numpy as np
 from pathlib import PurePath
+import traceback
 
 from ophyd import Signal
 from ophyd import Component as Cpt
@@ -16,6 +17,7 @@ from ophyd.areadetector import (AreaDetector, PixiradDetectorCam, ImagePlugin,
 from ophyd.areadetector.plugins import PluginBase
 from ophyd.areadetector.cam import AreaDetectorCam
 from ophyd.device import BlueskyInterface
+from ophyd.utils.epics_pvs import set_and_wait
 from ophyd.areadetector.trigger_mixins import SingleTrigger
 from ophyd.areadetector.filestore_mixins import (FileStoreIterativeWrite,
                                                  FileStoreHDF5IterativeWrite,
@@ -29,6 +31,9 @@ from ophyd.areadetector.filestore_mixins import (FileStoreIterativeWrite,
 
 from hxntools.detectors.merlin import MerlinDetector
 from hxntools.handlers import register
+
+import logging
+logger = logging.getLogger('bluesky')
 
 try:
     from area_detector_handlers import HandlerBase
@@ -64,6 +69,11 @@ db.reg.register_handler('MERLIN_FLY', BulkMerlinDebug,
 db.reg.register_handler(BulkMerlin.HANDLER_NAME, BulkMerlin,
                         overwrite=True)
 
+from enum import Enum
+
+class SRXMode(Enum):
+    step = 1
+    fly = 2
 
 class MerlinFileStoreHDF5(FileStoreBase):
 
@@ -88,7 +98,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
     def make_filename(self):
         filename = new_short_uid()
-        formatter = datetime.datetime.now().strftime
+        formatter = datetime.now().strftime
         write_path = formatter(self.write_path_template)
         read_path = formatter(self.read_path_template)
 
@@ -97,7 +107,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
     @property
     def filestore_spec(self):
-        if self.parent._mode is SRXMode.fly:
+        if self.parent._mode == SRXMode.fly:
             return BulkMerlin.HANDLER_NAME
         return 'TPX_HDF5'
 
@@ -170,12 +180,12 @@ class SRXMerlin(SingleTrigger, MerlinDetector):
                # read_path_template='/nsls2/xf05id1/XF05ID1/MERLIN/%Y/%m/%d/',
                # read_path_template='/nsls2/xf05id1/XF05ID1/MERLIN/2021/02/11/',
                # read_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
-               read_path_template = LARGE_FILE_DIRECTORY_PATH + '/%Y/%m/%d/',
+               read_path_template = LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
                configuration_attrs=[],
                # write_path_template='/epicsdata/merlin/%Y/%m/%d/',
                # write_path_template='/epicsdata/merlin/2021/02/11/',
                # write_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
-               write_path_template=LARGE_FILE_DIRECTORY_PATH + '/%Y/%m/%d/',
+               write_path_template=LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
                root=LARGE_FILE_DIRECTORY_ROOT)
 
     stats1 = Cpt(StatsPlugin, 'Stats1:')
@@ -247,9 +257,15 @@ try:
                        read_attrs=['hdf5', 'cam', 'stats1'])
     merlin2.hdf5.read_attrs = []
     merlin2.hdf5.warmup()
-except TimeoutError:
+except TimeoutError as ex:
     print('\nCannot connect to Merlin. Continuing without device.\n')
+    # print(f"Exception: {ex}")
+    traceback.print_exc()
+    print()
 except Exception:
     print('\nUnexpected error connecting to Merlin.\n',
           sys.exc_info()[0],
           end='\n\n')
+    traceback.print_exc()
+    print()
+
