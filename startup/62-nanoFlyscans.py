@@ -482,7 +482,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             # 'arm' the all of the detectors for outputting fly data
             print(f"Starting the next row")
             for d in flying_zebra.detectors:
-                if d and (d.name != "merlin2"):
+                # if d and (d.name != "merlin2"):
+                if d:
                     yield from bps.mov(d.fly_next, True)
             # print('h5 armed\t',time.time())
             if (snake is False):

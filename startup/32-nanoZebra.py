@@ -294,7 +294,7 @@ class SRXFlyer1Axis(Device):
         # self.stage_sigs[self._encoder.output3.ttl.addr] = 31
 
         # This is for the merlin
-        # self.stage_sigs[self._encoder.output2.ttl.addr] = 31
+        self.stage_sigs[self._encoder.output2.ttl.addr] = 31
 
         # # self.stage_sigs[self._encoder.output2.ttl.addr] = 53
         # # This is for the dexela
