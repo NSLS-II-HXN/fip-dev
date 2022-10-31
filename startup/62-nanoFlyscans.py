@@ -130,6 +130,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # when in external trigger mode
         dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
         dpc.cam.stage_sigs['acquire_period'] = 0.75 * dwell
+        # dpc.cam.stage_sigs['acquire_period'] = 0.25 * dwell
         dpc.cam.stage_sigs['num_images'] = 1
         dpc.stage_sigs['total_points'] = xnum
         dpc.hdf5.stage_sigs['num_capture'] = xnum

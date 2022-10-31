@@ -283,8 +283,8 @@ class SRXFlyer1Axis(Device):
         # print(zebra_pvname)
 
         # # Gating info for encoder capture
-        # self.stage_sigs[self._encoder.pc.gate_num] = 1
-        # self.stage_sigs[self._encoder.pc.pulse_start] = 0
+        self.stage_sigs[self._encoder.pc.gate_num] = 1
+        self.stage_sigs[self._encoder.pc.pulse_start] = 0
 
         # self.stage_sigs[self._encoder.pulse3.width] = 0.1
         # self.stage_sigs[self._encoder.pulse4.width] = 0.1
@@ -294,7 +294,9 @@ class SRXFlyer1Axis(Device):
         # self.stage_sigs[self._encoder.output3.ttl.addr] = 31
 
         # This is for the merlin
-        self.stage_sigs[self._encoder.output2.ttl.addr] = 31
+        # self.stage_sigs[self._encoder.output2.ttl.addr] = 31
+        self.stage_sigs[self._encoder.output1.ttl.addr] = 31
+        # self.stage_sigs[self._encoder.output1.ttl.addr] = 36
 
         # # self.stage_sigs[self._encoder.output2.ttl.addr] = 53
         # # This is for the dexela
@@ -357,6 +359,8 @@ class SRXFlyer1Axis(Device):
         else:
             raise ValueError(f"Unknown value: dir={dir!r}")
 
+        print(f"stage_sigs={self.stage_sigs}") ##
+
         super().stage()
 
     def describe_collect(self):
@@ -414,6 +418,8 @@ class SRXFlyer1Axis(Device):
         if decrement < 1e-5:
             # print('Changing the pulse width')
             decrement = 1e-5
+        print(f"gate_start={xstart - direction * (pxsize/2)}")
+        print(f"extent={extent}")
         self._encoder.pc.gate_start.put(xstart - direction * (pxsize / 2))
         # self._encoder.pc.gate_step.put(extent + 0.051)
         self._encoder.pc.gate_step.put(extent + 0.060)

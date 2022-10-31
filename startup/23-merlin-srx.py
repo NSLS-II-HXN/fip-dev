@@ -180,12 +180,14 @@ class SRXMerlin(SingleTrigger, MerlinDetector):
                # read_path_template='/nsls2/xf05id1/XF05ID1/MERLIN/%Y/%m/%d/',
                # read_path_template='/nsls2/xf05id1/XF05ID1/MERLIN/2021/02/11/',
                # read_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
-               read_path_template = LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
+               # read_path_template = LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
+               read_path_template = LARGE_FILE_DIRECTORY_PATH,
                configuration_attrs=[],
                # write_path_template='/epicsdata/merlin/%Y/%m/%d/',
                # write_path_template='/epicsdata/merlin/2021/02/11/',
                # write_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
-               write_path_template=LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
+               # write_path_template=LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
+               write_path_template = LARGE_FILE_DIRECTORY_PATH,
                root=LARGE_FILE_DIRECTORY_ROOT)
 
     stats1 = Cpt(StatsPlugin, 'Stats1:')
@@ -223,7 +225,8 @@ class SRXMerlin(SingleTrigger, MerlinDetector):
             # self.stage_sigs[self.cam.acquire_time] = 0.005
             # self.stage_sigs[self.cam.acquire_period] = 0.0066392
 
-            self.stage_sigs[self.cam.trigger_mode] = 2
+            self.stage_sigs[self.cam.image_mode] = 1  # 0 -single, 1 - multiple
+            self.stage_sigs[self.cam.trigger_mode] = 2  # 0 - internal, 2 - start rising
             self._mode = SRXMode.fly
         else:
             # Set trigger mode
@@ -256,6 +259,7 @@ try:
                        name='merlin2',
                        read_attrs=['hdf5', 'cam', 'stats1'])
     merlin2.hdf5.read_attrs = []
+    merlin2.cam.acquire_period.tolerance = 0.002  # default is 0.001
     merlin2.hdf5.warmup()
 except TimeoutError as ex:
     print('\nCannot connect to Merlin. Continuing without device.\n')
