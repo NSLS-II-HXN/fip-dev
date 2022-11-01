@@ -12,11 +12,27 @@ class EigerBase(AreaDetector):
     """
     num_triggers = ADComponent(EpicsSignalWithRBV, 'cam1:NumTriggers')
 
-    file = Cpt(EigerSimulatedFilePlugin, suffix='cam1:',
-               #write_path_template='/XF11ID/data/%Y/%m/%d/',
-               write_path_template='/nsls2/data/chx/legacy/data/%Y/%m/%d/',
-               #root='/XF11ID/',
-               root='/nsls2/data/chx/legacy/data/')
+    hdf5 = Cpt(HDF5PluginWithFileStoreMerlin, 'HDF1:',
+               read_attrs=[],
+               # read_path_template='/nsls2/xf05id1/XF05ID1/MERLIN/%Y/%m/%d/',
+               # read_path_template='/nsls2/xf05id1/XF05ID1/MERLIN/2021/02/11/',
+               # read_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
+               # read_path_template = LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
+               read_path_template = LARGE_FILE_DIRECTORY_PATH,
+               configuration_attrs=[],
+               # write_path_template='/epicsdata/merlin/%Y/%m/%d/',
+               # write_path_template='/epicsdata/merlin/2021/02/11/',
+               # write_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
+               # write_path_template=LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
+               write_path_template = LARGE_FILE_DIRECTORY_PATH,
+               root=LARGE_FILE_DIRECTORY_ROOT)
+
+
+    # file = Cpt(EigerSimulatedFilePlugin, suffix='cam1:',
+    #            #write_path_template='/XF11ID/data/%Y/%m/%d/',
+    #            write_path_template='/nsls2/data/chx/legacy/data/%Y/%m/%d/',
+    #            #root='/XF11ID/',
+    #            root='/nsls2/data/chx/legacy/data/')
 
     beam_center_x = ADComponent(EpicsSignalWithRBV, 'cam1:BeamX')
     beam_center_y = ADComponent(EpicsSignalWithRBV, 'cam1:BeamY')
