@@ -81,6 +81,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.stage_sigs.update([('auto_increment', 'Yes'),
                                 ('array_counter', 0),
                                 ('auto_save', 'Yes'),
@@ -90,6 +91,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
                                 # (self.compression, 'zlib'),
                                 (self.capture, 1)
                                 ])
+
         self._point_counter = None
 
     def unstage(self):
@@ -130,6 +132,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
         # before capture mode is turned on. They will not be reset
         # on 'unstage' anyway.
         # set_and_wait(self.file_path, write_path)
+        self.file_path.set(write_path).wait()
         set_and_wait(self.file_name, filename)
         set_and_wait(self.file_number, 0)
         staged = super().stage()
@@ -158,7 +161,6 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
 
 class HDF5PluginWithFileStoreMerlin(HDF5Plugin, MerlinFileStoreHDF5):
-
     def stage(self):
         if np.array(self.array_size.get()).sum() == 0:
             raise Exception("you must warmup the hdf plugin via the `warmup()` "
@@ -227,6 +229,7 @@ class SRXMerlin(SingleTrigger, MerlinDetector):
 
             self.stage_sigs[self.cam.image_mode] = 1  # 0 -single, 1 - multiple
             self.stage_sigs[self.cam.trigger_mode] = 2  # 0 - internal, 2 - start rising
+
             self._mode = SRXMode.fly
         else:
             # Set trigger mode
@@ -260,6 +263,10 @@ try:
                        read_attrs=['hdf5', 'cam', 'stats1'])
     merlin2.hdf5.read_attrs = []
     merlin2.cam.acquire_period.tolerance = 0.002  # default is 0.001
+
+    # Should be set before warmup
+    merlin2.hdf5.nd_array_port = "MERLIN"
+
     merlin2.hdf5.warmup()
 except TimeoutError as ex:
     print('\nCannot connect to Merlin. Continuing without device.\n')
