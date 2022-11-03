@@ -265,7 +265,7 @@ try:
     merlin2.cam.acquire_period.tolerance = 0.002  # default is 0.001
 
     # Should be set before warmup
-    merlin2.hdf5.nd_array_port = "MERLIN"
+    merlin2.hdf5.nd_array_port.set("MERLIN").wait()
 
     merlin2.hdf5.warmup()
 except TimeoutError as ex:
