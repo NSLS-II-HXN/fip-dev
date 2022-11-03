@@ -89,7 +89,8 @@ class MerlinFileStoreHDF5(FileStoreBase):
                                 (self.file_template, '%s%s_%6.6d.h5'),
                                 (self.file_write_mode, 'Stream'),
                                 # (self.compression, 'zlib'),
-                                (self.capture, 1)
+                                (self.capture, 1),
+                                # (self.capture, 0),
                                 ])
 
         self._point_counter = None
