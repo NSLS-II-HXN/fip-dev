@@ -43,7 +43,7 @@ def set_scanner_velocity(velocity=30):
 def reset_scanner_velocity():
     #for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
     for d in [nano_stage.sx, nano_stage.sy]:
-        d.velocity.set(30)
+        d.velocity.set(300)
 
 
 from datetime import datetime

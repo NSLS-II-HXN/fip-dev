@@ -195,6 +195,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     flying_zebra._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
     yield from bps.sleep(1)
 
+    reset_scanner_velocity()
+
     print(f"Ready to start the scan !!!")  ##
 
     @stage_decorator(flying_zebra.detectors)
