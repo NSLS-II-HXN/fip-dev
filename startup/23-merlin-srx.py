@@ -13,7 +13,7 @@ from ophyd import Component as Cpt
 from ophyd.areadetector import (AreaDetector, PixiradDetectorCam, ImagePlugin,
                                 TIFFPlugin, StatsPlugin, HDF5Plugin,
                                 ProcessPlugin, ROIPlugin, TransformPlugin,
-                                OverlayPlugin, CamBase)
+                                OverlayPlugin)
 from ophyd.areadetector.plugins import PluginBase
 from ophyd.areadetector.cam import AreaDetectorCam
 from ophyd.device import BlueskyInterface
@@ -28,6 +28,8 @@ from ophyd.areadetector.filestore_mixins import (FileStoreIterativeWrite,
                                                  FileStoreBase,
                                                  FileStorePluginBase,
                                                  )
+
+from nslsii.ad33 import CamV33Mixin, SingleTriggerV33
 
 # from hxntools.detectors.merlin import MerlinDetector
 # from hxntools.handlers import register
@@ -170,7 +172,7 @@ class HDF5PluginWithFileStoreMerlin(HDF5Plugin, MerlinFileStoreHDF5):
         return super().stage()
 
 
-class MerlinDetectorCam(CamBase):
+class MerlinDetectorCam(AreaDetectorCam, CamV33Mixin):
     pass
 
 
@@ -182,7 +184,7 @@ class MerlinDetector(AreaDetector):
               )
 
 
-class SRXMerlin(SingleTrigger, MerlinDetector):
+class SRXMerlin(SingleTriggerV33, MerlinDetector):
     total_points = Cpt(Signal,
                        value=1,
                        doc="The total number of points to be taken")
@@ -205,24 +207,25 @@ class SRXMerlin(SingleTrigger, MerlinDetector):
                write_path_template = LARGE_FILE_DIRECTORY_PATH,
                root=LARGE_FILE_DIRECTORY_ROOT)
 
-    # stats1 = Cpt(StatsPlugin, 'Stats1:')
-    # stats2 = Cpt(StatsPlugin, 'Stats2:')
-    # stats3 = Cpt(StatsPlugin, 'Stats3:')
-    # stats4 = Cpt(StatsPlugin, 'Stats4:')
-    # stats5 = Cpt(StatsPlugin, 'Stats5:')
-    # proc1 = Cpt(ProcessPlugin, 'Proc1:')
-    # transform1 = Cpt(TransformPlugin, 'Trans1:')
+    stats1 = Cpt(StatsPlugin, 'Stats1:')
+    stats2 = Cpt(StatsPlugin, 'Stats2:')
+    stats3 = Cpt(StatsPlugin, 'Stats3:')
+    stats4 = Cpt(StatsPlugin, 'Stats4:')
+    stats5 = Cpt(StatsPlugin, 'Stats5:')
+    proc1 = Cpt(ProcessPlugin, 'Proc1:')
+    transform1 = Cpt(TransformPlugin, 'Trans1:')
 
-    # roi1 = Cpt(ROIPlugin, 'ROI1:')
-    # roi2 = Cpt(ROIPlugin, 'ROI2:')
-    # roi3 = Cpt(ROIPlugin, 'ROI3:')
-    # roi4 = Cpt(ROIPlugin, 'ROI4:')
+    roi1 = Cpt(ROIPlugin, 'ROI1:')
+    roi2 = Cpt(ROIPlugin, 'ROI2:')
+    roi3 = Cpt(ROIPlugin, 'ROI3:')
+    roi4 = Cpt(ROIPlugin, 'ROI4:')
 
     # def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
     #              **kwargs):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._mode = SRXMode.step
+        self.cam.ensure_nonblocking()
 
     def stop(self, success=False):
         ret = super().stop(success=success)
