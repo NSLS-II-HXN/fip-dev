@@ -2,6 +2,7 @@ print(f"Loading {__file__}...")
 
 from collections import OrderedDict
 
+from epics import caput, caget
 import os
 import threading
 import h5py
@@ -14,6 +15,7 @@ from databroker.assets.handlers import HandlerBase
 
 xs = None  # No Xspress3
 use_sclr1 = False  # Set this False to run ano zebra without 'sclr1'
+# use_sclr1 = True
 
 # class CurrentPreampZebra(Device):
 #     ch0 = Cpt(EpicsSignalRO, "Cur:I0-I")
@@ -165,6 +167,8 @@ class ZebraPositionCapture(Device):
     block_state_reset = Cpt(EpicsSignal, "SYS_RESET.PROC")
     data = Cpt(ZebraPositionCaptureData, "")
 
+    pos1_set = Cpt(EpicsSignal, "POS1_SET")
+
     def stage(self):
         self.arm.put(1)
 
@@ -207,10 +211,6 @@ class SRXZebra(Zebra):
 # LARGE_FILE_DIRECTORY_PATH = "/nsls2/data/srx/assets/zebra/2021/2021-3/"
 # LARGE_FILE_DIRECTORY_PATH = "/tmp/collected_data"
 
-from datetime import datetime
-LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
-
-
 # import os
 # os.makedirs(LARGE_FILE_DIRECTORY_PATH, exist_ok=True)  # This should not be done in production
 
@@ -221,7 +221,8 @@ class SRXFlyer1Axis(Device):
     """
     LARGE_FILE_DIRECTORY_WRITE_PATH = LARGE_FILE_DIRECTORY_PATH
     LARGE_FILE_DIRECTORY_READ_PATH = LARGE_FILE_DIRECTORY_PATH
-    KNOWN_DETS = {"xs", "xs2", "merlin", "dexela"}
+    LARGE_FILE_DIRECTORY_ROOT = LARGE_FILE_DIRECTORY_ROOT
+    KNOWN_DETS = {"xs", "xs2", "merlin2", "dexela"}
     fast_axis = Cpt(Signal, value="HOR", kind="config")
     slow_axis = Cpt(Signal, value="VER", kind="config")
 
@@ -281,36 +282,40 @@ class SRXFlyer1Axis(Device):
         # )
         # print(zebra_pvname)
 
-        # Gating info for encoder capture
+        # # Gating info for encoder capture
         self.stage_sigs[self._encoder.pc.gate_num] = 1
         self.stage_sigs[self._encoder.pc.pulse_start] = 0
 
-        self.stage_sigs[self._encoder.pulse3.width] = 0.1
-        self.stage_sigs[self._encoder.pulse4.width] = 0.1
+        # self.stage_sigs[self._encoder.pulse3.width] = 0.1
+        # self.stage_sigs[self._encoder.pulse4.width] = 0.1
 
-        # PC gate output is 31 for zebra. Use it to trigger xspress3 and I0
-        self.stage_sigs[self._encoder.output1.ttl.addr] = 31
-        self.stage_sigs[self._encoder.output3.ttl.addr] = 31
+        # # PC gate output is 31 for zebra. Use it to trigger xspress3 and I0
+        # self.stage_sigs[self._encoder.output1.ttl.addr] = 31
+        # self.stage_sigs[self._encoder.output3.ttl.addr] = 31
+
         # This is for the merlin
-        self.stage_sigs[self._encoder.output2.ttl.addr] = 31
-        # self.stage_sigs[self._encoder.output2.ttl.addr] = 53
-        # This is for the dexela
-        self.stage_sigs[self._encoder.output4.ttl.addr] = 31
-        # This is for the xs2
-        # self.stage_sigs[self._encoder.output4.ttl.addr] = 31
+        # self.stage_sigs[self._encoder.output2.ttl.addr] = 31
+        self.stage_sigs[self._encoder.output1.ttl.addr] = 31
+        # self.stage_sigs[self._encoder.output1.ttl.addr] = 36
 
-        self.stage_sigs[self._encoder.pc.enc_pos1_sync] = 1
-        self.stage_sigs[self._encoder.pc.enc_pos2_sync] = 1
-        self.stage_sigs[self._encoder.pc.enc_pos3_sync] = 1
-        self.stage_sigs[self._encoder.pc.enc_pos4_sync] = 1
+        # # self.stage_sigs[self._encoder.output2.ttl.addr] = 53
+        # # This is for the dexela
+        # self.stage_sigs[self._encoder.output4.ttl.addr] = 31
+        # # This is for the xs2
+        # # self.stage_sigs[self._encoder.output4.ttl.addr] = 31
+
+        # self.stage_sigs[self._encoder.pc.enc_pos1_sync] = 1
+        # self.stage_sigs[self._encoder.pc.enc_pos2_sync] = 1
+        # self.stage_sigs[self._encoder.pc.enc_pos3_sync] = 1
+        # self.stage_sigs[self._encoder.pc.enc_pos4_sync] = 1
 
         if self._sis is not None:
             # Put SIS3820 into single count (not autocount) mode
-            self.stage_sigs[self._sis.count_mode] = 0
+            # self.stage_sigs[self._sis.count_mode] = 0
             # Stop the SIS3820
             self._sis.stop_all.put(1)
 
-        self._encoder.pc.block_state_reset.put(1)
+        # self._encoder.pc.block_state_reset.put(1)
         self.reg = reg
         self._document_cache = []
         self._last_bulk = None
@@ -323,34 +328,38 @@ class SRXFlyer1Axis(Device):
     #     yield from _read_fly_scan()
     def stage(self):
         dir = self.fast_axis.get()
-        if dir == "HOR":
-            self.stage_sigs[self._encoder.pc.enc] = "Enc2"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res2] = 5e-6
-        elif dir == "VER":
+        # if dir == "HOR":
+        #     self.stage_sigs[self._encoder.pc.enc] = "Enc2"
+        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
+        #     # self.stage_sigs[self._encoder.pc.enc_res2] = 5e-6
+        # elif dir == "VER":
+        #     self.stage_sigs[self._encoder.pc.enc] = "Enc1"
+        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
+        #     # self.stage_sigs[self._encoder.pc.enc_res1] = 5e-6
+        # elif dir == "DET2HOR":
+        #     self.stage_sigs[self._encoder.pc.enc] = "Enc3"
+        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
+        #     # self.stage_sigs[self._encoder.pc.enc_res1] = 5e-5
+        # elif dir == "DET2VER":
+        #     self.stage_sigs[self._encoder.pc.enc] = "Enc4"
+        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
+        #     # self.stage_sigs[self._encoder.pc.enc_res1] = 5e-5
+        if dir == "NANOHOR":
             self.stage_sigs[self._encoder.pc.enc] = "Enc1"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res1] = 5e-6
-        elif dir == "DET2HOR":
-            self.stage_sigs[self._encoder.pc.enc] = "Enc3"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res1] = 5e-5
-        elif dir == "DET2VER":
-            self.stage_sigs[self._encoder.pc.enc] = "Enc4"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res1] = 5e-5
-        elif dir == "NANOHOR":
-            self.stage_sigs[self._encoder.pc.enc] = "Enc1"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
+            # self.stage_sigs[self._encoder.pc.dir] = "Positive"
+            # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
         elif dir == "NANOVER":
             self.stage_sigs[self._encoder.pc.enc] = "Enc2"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
+            # self.stage_sigs[self._encoder.pc.dir] = "Positive"
+            # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
         elif dir == "NANOZ":
             self.stage_sigs[self._encoder.pc.enc] = "Enc3"
-            self.stage_sigs[self._encoder.pc.dir] = "Positive"
-            self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
+            # self.stage_sigs[self._encoder.pc.dir] = "Positive"
+            # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
+        else:
+            raise ValueError(f"Unknown value: dir={dir!r}")
+
+        print(f"stage_sigs={self.stage_sigs}") ##
 
         super().stage()
 
@@ -376,24 +385,25 @@ class SRXFlyer1Axis(Device):
 
         # Handle the ion chamber that the zebra is collecting
         if self._sis is not None:
-            desc["i0"] = spec
-            desc["i0"]["source"] = self._sis.mca2.pvname
-            desc["i0_time"] = spec
-            desc["i0_time"]["source"] = self._sis.mca1.pvname
-            desc["im"] = spec
-            desc["im"]["source"] = self._sis.mca3.pvname
-            desc["it"] = spec
-            desc["it"]["source"] = self._sis.mca4.pvname
+            sis_mca_names = self._sis_mca_names()
+            for n, name in enumerate(sis_mca_names):
+                desc[name] = spec
+                desc[name]["source"] = self._sis.mca_by_index[n + 1].spectrum.pvname
 
         return {"primary": desc}
 
     def kickoff(self, *, xstart, xstop, xnum, dwell):
+        print(f"Kickoff: xstart={xstart} xtop={xstop} dwell={dwell}")
+
         dets_by_name = {d.name: d for d in self.detectors}
 
         ## TODO: Need to make sure zebra is full setup for scan
         ## pulses2/3/4
         ## OR logic
         ## PC on position (NOT TIME!)
+
+        # self.pos1_set = xstart  # IS IT CORRECT OR SETTING self._encoder.pc.enc_pos1_sync.put(1) is sufficient???
+
         self._encoder.pc.arm.put(0)
         self._mode = "kicked off"
         self._npts = int(xnum)
@@ -408,14 +418,18 @@ class SRXFlyer1Axis(Device):
         if decrement < 1e-5:
             # print('Changing the pulse width')
             decrement = 1e-5
+        print(f"gate_start={xstart - direction * (pxsize/2)}")
+        print(f"extent={extent}")
         self._encoder.pc.gate_start.put(xstart - direction * (pxsize / 2))
-        self._encoder.pc.gate_step.put(extent + 0.051)
+        # self._encoder.pc.gate_step.put(extent + 0.051)
+        self._encoder.pc.gate_step.put(extent + 0.060)
         self._encoder.pc.gate_width.put(extent + 0.050)
 
         self._encoder.pc.pulse_start.put(0.0)
         self._encoder.pc.pulse_max.put(xnum)
         self._encoder.pc.pulse_step.put(pxsize)
-        self._encoder.pc.pulse_width.put(pxsize - decrement)
+        # self._encoder.pc.pulse_width.put(pxsize - decrement)
+        self._encoder.pc.pulse_width.put(pxsize * 0.9)
         # If decrement is too small, then zebra will not send individual pulses
         # but integrate over the entire line
         # Hopefully taken care of with decrement check above
@@ -432,14 +446,15 @@ class SRXFlyer1Axis(Device):
         #     self._encoder.pulse3.input_addr.put(31)
         #     self._encoder.pulse4.input_addr.put(31)
 
-        self._encoder.output1.ttl.addr.put(31)
-        self._encoder.output3.ttl.addr.put(36)
-        self._encoder.pulse3.input_addr.put(31)
-        self._encoder.pulse4.input_addr.put(31)
+        # self._encoder.output1.ttl.addr.put(31)
+        # self._encoder.output3.ttl.addr.put(36)
+        # self._encoder.pulse3.input_addr.put(31)
+        # self._encoder.pulse4.input_addr.put(31)
 
-        self._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
-        self._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
-        self._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
+        # print("Synchronizing stage ...")
+        # self._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
+        # self._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
+        # self._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
         # self._encoder.pc.enc_pos4_sync.put(1)  # None
 
         # Arm the zebra
@@ -452,6 +467,10 @@ class SRXFlyer1Axis(Device):
         # TODO Return a status object *first*
         # and do the above asynchronously.
         return st
+
+    def _sis_mca_names(self):
+        n_mcas = n_scaler_mca
+        return [getattr(self._sis.channels, f"chan{_}").name for _ in range(1, n_mcas + 1)]
 
     def complete(self):
         """
@@ -497,33 +516,34 @@ class SRXFlyer1Axis(Device):
 
         self.__filestore_resource, datum_factory_z = resource_factory(
             "ZEBRA_HDF51",
-            root="/",
+            root=self.LARGE_FILE_DIRECTORY_ROOT,
             resource_path=self.__read_filepath,
             resource_kwargs={},
             path_semantics="posix",
         )
-        # self.__filestore_resource_sis, datum_factory_sis = resource_factory(
-        #     "SIS_HDF51",
-        #     root="/",
-        #     resource_path=self.__read_filepath_sis,
-        #     resource_kwargs={},
-        #     path_semantics="posix",
-        # )
+        self.__filestore_resource_sis, datum_factory_sis = resource_factory(
+            "SIS_HDF51",
+            root=self.LARGE_FILE_DIRECTORY_ROOT,
+            resource_path=self.__read_filepath_sis,
+            resource_kwargs={},
+            path_semantics="posix",
+        )
 
         time_datum = datum_factory_z({"column": "time"})
         enc1_datum = datum_factory_z({"column": "enc1"})
         enc2_datum = datum_factory_z({"column": "enc2"})
         enc3_datum = datum_factory_z({"column": "enc3"})
-        #sis_datum = datum_factory_sis({"column": "i0"})
-        #sis_datum_im = datum_factory_sis({"column": "im"})
-        #sis_datum_it = datum_factory_sis({"column": "it"})
-        #sis_time = datum_factory_sis({"column": "time"})
+        if self._sis:
+            sis_mca_names = self._sis_mca_names()
+            sis_datum = []
+            for name in sis_mca_names:
+                sis_datum.append(datum_factory_sis({"column": name}))
 
-        self._document_cache.extend(
-            ("resource", d)
-            # for d in (self.__filestore_resource, self.__filestore_resource_sis)
-            for d in (self.__filestore_resource,)
-        )
+        resources = [self.__filestore_resource]
+        if self._sis:
+            resources.append(self.__filestore_resource_sis)
+        self._document_cache.extend(("resource", _) for _ in resources)
+
         self._document_cache.extend(
             ("datum", d)
             for d in (
@@ -531,12 +551,11 @@ class SRXFlyer1Axis(Device):
                 enc1_datum,
                 enc2_datum,
                 enc3_datum,
-                #sis_datum,
-                #sis_time,
-                #sis_datum_im,
-                #sis_datum_it,
             )
         )
+
+        if self._sis:
+            self._document_cache.extend(("datum", d) for d in sis_datum)
 
         # grab the asset documents from all of the child detectors
         for d in self._dets:
@@ -561,7 +580,7 @@ class SRXFlyer1Axis(Device):
             if self._sis is None:
                 return
             export_sis_data(
-                self._sis, self.__write_filepath_sis, self._encoder
+                self._sis, sis_mca_names, self.__write_filepath_sis, self._encoder
             )
 
         if amk_debug_flag:
@@ -580,22 +599,17 @@ class SRXFlyer1Axis(Device):
                 "enc1": enc1_datum["datum_id"],
                 "enc2": enc2_datum["datum_id"],
                 "enc3": enc3_datum["datum_id"],
-                #"i0": sis_datum["datum_id"],
-                #"i0_time": sis_time["datum_id"],
-                #"im": sis_datum_im["datum_id"],
-                #"it": sis_datum_it["datum_id"],
             },
             "timestamps": {
                 "time": time_datum["datum_id"],  # not a typo#
                 "enc1": time_datum["datum_id"],
                 "enc2": time_datum["datum_id"],
                 "enc3": time_datum["datum_id"],
-                #"i0": sis_time["datum_id"],
-                #"i0_time": sis_time["datum_id"],
-                #"im": sis_datum_im["datum_id"],
-                #"it": sis_datum_it["datum_id"],
             },
         }
+        if self._sis:
+            self._last_bulk["data"].update({k: v["datum_id"] for k, v in zip(sis_mca_names, sis_datum)})
+            self._last_bulk["timestamps"].update({k: v["datum_id"] for k, v in zip(sis_mca_names, sis_datum)})
         for d in self._dets:
             reading = d.read()
             self._last_bulk["data"].update(
@@ -681,10 +695,12 @@ except Exception as ex:
 
 
 # Enable capture for 'enc1', 'enc2' and 'enc3'. At SRX capture is enabled via CSS.
-from epics import caput
 caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
 caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
 caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
+# print(f'PC_BIT_CAP:B0 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0")}')
+# print(f'PC_BIT_CAP:B1 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1")}')
+# print(f'PC_BIT_CAP:B2 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2")}')
 
 # For confocal
 # For plans that call xs2,
@@ -727,10 +743,28 @@ def export_nano_zebra_data(zebra, filepath, fastaxis):
             print("THE ZEBRA IS BEHAVING BADLY CARRYING ON")
             break
 
+
+    pxsize = zebra.pc.pulse_step.get()  # Pixel size
+    encoder = zebra.pc.enc.get(as_string=True)  # Encoder ('Enc1', 'Enc2' or 'Enc3')
+
+    print(f"Loading from Zebra: time")
     time_d = zebra.pc.data.time.get()
+    print(f"Loading from Zebra: enc1")
     enc1_d = zebra.pc.data.enc1.get()
+    print(f"Loading from Zebra: enc2")
     enc2_d = zebra.pc.data.enc2.get()
+    print(f"Loading from Zebra: enc3")
     enc3_d = zebra.pc.data.enc3.get()
+
+    # Correction for the encoder values so that they represent the centers of the bins
+    if encoder.lower() == "enc1":
+        enc1_d += pxsize / 2
+    elif encoder.lower() == "enc2":
+        enc2_d += pxsize / 2
+    elif encoder.lower() == "enc3":
+        enc3_d += pxsize / 2
+    else:
+        print(f"Unrecognized encoder name: {encoder}")
 
     print(f"===================================================")
     print(f"COLLECTED DATA:")
@@ -807,6 +841,45 @@ def export_zebra_data(zebra, filepath, fast_axis):
         dset3[...] = np.array(enc3_d)
 
 
+def export_sis_data(ion, mca_names, filepath, zebra):
+    print(f"EXPORTING SCALER DATA .................................")
+    N = ion.nuse_all.get()
+
+    n_mcas = len(mca_names)
+
+    print("Step1")
+    mca_data = []
+    for n in range(1, n_mcas + 1):
+        mca = ion.mca_by_index[n].spectrum.get(timeout=5.0)
+        mca_data.append(mca)
+
+    print("Step2")
+    correct_length = int(zebra.pc.data.num_down.get())
+
+    print(f"File name: {filepath!r}")
+
+    with h5py.File(filepath, "w") as f:
+        print("Step3")
+        for n in range(len(mca_data)):
+            mca = mca_data[n]
+            mca = mca[1::2]
+            if len(mca) != correct_length:
+                print(f"Incorrect number of points ({len(mca)}) loaded from MCA{n + 1}: {correct_length} points are expected")
+                if len(mca > correct_length):
+                    mca = mca[:correct_length]
+                else:
+                    mca = np.append(mca, [1e10] * (correct_length - len(mca)))
+            mca_data[n] = mca
+
+        print("Step4")
+        for n, name in enumerate(mca_names):
+            dset = f.create_dataset(name, (correct_length,), dtype="f")
+            dset[...] = np.asarray(mca_data[n])
+
+    print(f"FINISHED EXPORTING SCALER DATA")
+
+
+
 class ZebraHDF5Handler(HandlerBase):
     HANDLER_NAME = "ZEBRA_HDF51"
 
@@ -818,3 +891,22 @@ class ZebraHDF5Handler(HandlerBase):
 
 
 db.reg.register_handler("ZEBRA_HDF51", ZebraHDF5Handler, overwrite=True)
+
+
+class SISHDF5Handler(HandlerBase):
+    HANDLER_NAME = "SIS_HDF51"
+
+    def __init__(self, resource_fn):
+        self._handle = h5py.File(resource_fn, "r")
+
+    def __call__(self, *, column):
+        return self._handle[column][:]
+
+    def close(self):
+        self._handle.close()
+        self._handle = None
+        super().close()
+
+
+db.reg.register_handler("SIS_HDF51", SISHDF5Handler, overwrite=True)
+

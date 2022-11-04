@@ -35,7 +35,18 @@ nano_stage = SRXNanoStage('XF:03IDC-ES{PT:Smpl-Ax:', name='nano_stage')
 
 # nanoKB_interferometer = SRXNanoInterferometer('XF:05IDD-ES:1{PICOSCALE:1}', name='nanoKB_interferometer')
 
+def set_scanner_velocity(velocity=30):
+    # for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
+    for d in [nano_stage.sx, nano_stage.sy]:
+        d.velocity.set(velocity)
+
 def reset_scanner_velocity():
-    for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
+    #for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
+    for d in [nano_stage.sx, nano_stage.sy]:
         d.velocity.set(30)
 
+
+from datetime import datetime
+# LARGE_FILE_DIRECTORY_PATH = "/data" + datetime.now().strftime("/%Y/%m/%d")
+LARGE_FILE_DIRECTORY_ROOT = "/data/fip-data-test"
+LARGE_FILE_DIRECTORY_PATH = "/data/fip-data-test" + datetime.now().strftime("/%Y/%m/%d")

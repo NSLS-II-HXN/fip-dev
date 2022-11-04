@@ -3,12 +3,14 @@ print(f"Loading {__file__}...")
 import time as ttime
 import numpy as np
 
+from datetime import datetime
 import time as ttime
 import matplotlib.pyplot as plt
 from collections import ChainMap
 
 from ophyd import Device
 from ophyd.sim import NullStatus
+from ophyd.device import Staged
 from ophyd.areadetector.filestore_mixins import resource_factory
 
 from bluesky.preprocessors import (stage_decorator,
@@ -20,9 +22,17 @@ from bluesky.plan_stubs import (one_1d_step, kickoff, collect,
 from bluesky.plans import (scan, )
 from bluesky.callbacks import CallbackBase, LiveGrid
 
+from bluesky import Msg
+
 from hxntools.handlers import register
 
 from bluesky.utils import short_uid
+
+# def _pre_scan(dets, total_points, count_time):
+#     # yield Msg('hxn_next_scan_id')
+#     yield Msg('hxn_scan_setup', detectors=dets, total_points=total_points,
+#               count_time=count_time)
+
 
 def tic():
     return ttime.monotonic()
@@ -105,25 +115,26 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     dets_by_name = {d.name : d
                     for d in detectors}
 
-    # # Set up the merlin
-    # if 'merlin' in dets_by_name:
-    #     dpc = dets_by_name['merlin']
-    #     # TODO use stage sigs
-    #     # Set trigger mode
-    #     # dpc.cam.trigger_mode.put(2)
-    #     # Make sure we respect whatever the exposure time is set to
-    #     if (dwell < 0.0066392):
-    #         print('The Merlin should not operate faster than 7 ms.')
-    #         print('Changing the scan dwell time to 7 ms.')
-    #         dwell = 0.007
-    #     # According to Ken's comments in hxntools, this is a de-bounce time
-    #     # when in external trigger mode
-    #     dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
-    #     dpc.cam.stage_sigs['acquire_period'] = 0.75 * dwell
-    #     dpc.cam.stage_sigs['num_images'] = 1
-    #     dpc.stage_sigs['total_points'] = xnum
-    #     dpc.hdf5.stage_sigs['num_capture'] = xnum
-    #     del dpc
+    # Set up the merlin
+    if 'merlin2' in dets_by_name:
+        dpc = dets_by_name['merlin2']
+        # TODO use stage sigs
+        # Set trigger mode
+        # dpc.cam.trigger_mode.put(2)
+        # Make sure we respect whatever the exposure time is set to
+        if (dwell < 0.0066392):
+            print('The Merlin should not operate faster than 7 ms.')
+            print('Changing the scan dwell time to 7 ms.')
+            dwell = 0.007
+        # According to Ken's comments in hxntools, this is a de-bounce time
+        # when in external trigger mode
+        dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
+        dpc.cam.stage_sigs['acquire_period'] = 0.75 * dwell
+        # dpc.cam.stage_sigs['acquire_period'] = 0.25 * dwell
+        dpc.cam.stage_sigs['num_images'] = 1
+        dpc.stage_sigs['total_points'] = xnum
+        dpc.hdf5.stage_sigs['num_capture'] = xnum
+        del dpc
 
     # # Setup dexela
     # if ('dexela' in dets_by_name):
@@ -134,7 +145,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     # If delta is None, set delta based on time for acceleration
     if delta is None:
-        MIN_DELTA = 0.100  # old default value
+        MIN_DELTA = 0.5  # old default value
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
         t_acc = xmotor.acceleration.get()  # acceleration time
         delta = 0.5 * t_acc * v  # distance the stage will travel in t_acc
@@ -144,14 +155,20 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # Move to start scanning location
     # Calculate move to scan start
     pxsize = (xstop - xstart) / (xnum - 1)
-    row_start = xstart - delta - (pxsize / 2)
-    row_stop = xstop + delta + (pxsize / 2)
+    # row_start = xstart - delta - (pxsize / 2)
+    # row_stop = xstop + delta + (pxsize / 2)
+    row_start = xstart - delta - max(pxsize, 1)
+    row_stop = xstop + delta + max(pxsize, 1)
     # yield from mv(xmotor, row_start,
     #               ymotor, ystart)
 
     # Run a peakup before the map?
     if (align):
         yield from peakup_fine(shutter=shutter)
+
+    # This is added for consistency with existing HXN plans. Requires custom
+    #   setup of RE:   hxntools.scans.setup(RE=RE)
+    # yield Msg('hxn_next_scan_id')
 
     if "scan" not in md:
         md["scan"] = {}
@@ -172,6 +189,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     md['scan']['snake'] = snake
     md['scan']['shape'] = (xnum, ynum)
 
+    # Synchronize encoders
+    flying_zebra._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
+    flying_zebra._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
+    flying_zebra._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
+    yield from bps.sleep(1)
+
+    print(f"Ready to start the scan !!!")  ##
 
     @stage_decorator(flying_zebra.detectors)
     def fly_each_step(motor, step, row_start, row_stop):
@@ -221,6 +245,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # Set the scan speed
         # Is abs_set(wait=True) or mv() faster?
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
+        print(f"Forward speed for the fast axis: {v}")
         # yield from abs_set(xmotor.velocity, v, wait=True)  # set the "stage speed"
         # if (v > xmotor.velocity.high_limit):
         #     raise ValueError(f'Desired motor velocity too high\nMax velocity: {xmotor.velocity.high_limit}')
@@ -249,10 +274,28 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         #     yield from mv(xs2.hdf5.num_capture, xnum,
         #                   xs2.settings.num_images, xnum)
 
-        # if ('merlin' in dets_by_name):
-        #     merlin = dets_by_name['merlin']
-        #     yield from abs_set(merlin.hdf5.num_capture, xnum, wait=True)
-        #     yield from abs_set(merlin.cam.num_images, xnum, wait=True)
+        # # Merlin code from the original SRX plan
+        if ('merlin2' in dets_by_name):
+            merlin2 = dets_by_name['merlin2']
+            yield from abs_set(merlin2.hdf5.num_capture, xnum, wait=True)
+            yield from abs_set(merlin2.cam.num_images, xnum, wait=True)
+
+
+        # # Set up HXN Merlin 2 (from 'hxnfly' Flyscan._detector_setup())
+        # if ("merlin2" in dets_by_name):
+        #     det = merlin2
+        #     settings = det.mode_settings
+        #     settings.mode.put('external')
+        #     settings.scan_type.put('fly')
+        #     settings.total_points.put(xnum)
+
+        #     print('Staging %s (settings: %s)', det.name, settings.get())
+
+        #     if det._staged == Staged.yes:
+        #         print('Detector %s already staged - restaging', det.name)
+        #         det.unstage()
+
+        #     det.stage()
 
         # if ('dexela' in dets_by_name):
         #     dexela = dets_by_name['dexela']
@@ -277,6 +320,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 yield from kickoff(flying_zebra,
                                    xstart=stop_zebra, xstop=start_zebra, xnum=xnum, dwell=dwell,
                                    wait=True)
+            # yield from bps.sleep(0.1)
+
         if verbose:
             t_zebkickoff = tic()
         yield from zebra_kickoff()
@@ -301,7 +346,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             if verbose:
                 print(f'  triggering {d.name}')
             st = yield from bps.trigger(d, group=row_str)
-            st.add_callback(lambda x: toc(t_datacollect, str=f"  status object  {datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
+            st.add_callback(lambda x: toc(t_datacollect, str=f"  status object  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
             if (d.name == 'dexela'):
                 yield from bps.sleep(1)
         if verbose:
@@ -314,7 +359,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # start the 'fly'
         def print_watch(*args, **kwargs):
             with open('~/bluesky_output.txt', 'a') as f:
-                f.write(datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S.%f\n'))
+                f.write(datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f\n'))
                 # print(args)
                 f.write(json.dumps(kwargs))
                 f.write('\n')
@@ -410,6 +455,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                                   x_positive='right', y_positive='down')]
     else:
         livepopup = []
+
     @subs_decorator(livepopup)
     @subs_decorator({'start': at_scan})
     @subs_decorator({'stop': finalize_scan})
@@ -419,9 +465,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     @stage_decorator([flying_zebra])  # Below, 'scan' stage ymotor.
     @run_decorator(md=md)
     def plan():
+        print("Starting the plan")
+        print(f"flying_zebra.detectors={flying_zebra.detectors}")
+
         # TODO move this to stage sigs
         for d in flying_zebra.detectors:
-            yield from bps.mov(d.total_points, xnum)
+            if d.name != "merlin2":
+                yield from bps.mov(d.total_points, xnum)
 
         # TODO move this to stage sigs
         # yield from bps.mov(xs.external_trig, True)  ## Uncomment this
@@ -433,6 +483,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             # 'arm' the all of the detectors for outputting fly data
             print(f"Starting the next row")
             for d in flying_zebra.detectors:
+                # if d and (d.name != "merlin2"):
                 if d:
                     yield from bps.mov(d.fly_next, True)
             # print('h5 armed\t',time.time())
@@ -460,12 +511,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             ystep = ystep + 1
 
         # TODO this should be taken care of by stage sigs
-        ion = flying_zebra.sclr
-        if ion:
-            yield from bps.mov(xs.external_trig, False,
-                               ion.count_mode, 1)
-        yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-        yield from bps.sleep(2)
+        # ion = flying_zebra.sclr
+        # if ion:
+        #     yield from bps.mov(xs.external_trig, False,
+        #                        ion.count_mode, 1)
+
+        # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
+        # yield from bps.sleep(2)
 
     # toc(t_setup, str='Setup time')
 
@@ -510,8 +562,16 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
-    yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-    yield from bps.sleep(2)
+    # yield from bps.sleep(1)
+    set_scanner_velocity(30)
+    # yield from bps.sleep(1)
+    # print("Centering X-axis ...")
+    # yield from mv(nano_stage.sx, 0)
+    # print("Centering Y-axis ...")
+    # yield from mv(nano_stage.sy, 0)
+    # print("Centering Z-axis ...")
+    # yield from mv(nano_stage.sz, 0)
+    # yield from bps.sleep(2)
 
 
 def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):
@@ -527,18 +587,21 @@ def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):
     _xs = kwargs.pop('xs', xs)
     if extra_dets is None:
         extra_dets = []
-    dets = [_xs] + extra_dets
+    #dets = [_xs] + extra_dets
     dets = [] if  _xs is None else [_xs]
+    dets = dets + extra_dets
     print(f"dets={dets}")
     print('Scan starting. Centering the scanner...')
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
-    yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-    yield from bps.sleep(2)
+    #yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
+    #yield from mv(nano_stage.sx, 0, nano_stage.sy, 0)
+    #yield from bps.sleep(2)
 
     # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
 
+    set_scanner_velocity(30)
 
 
 def nano_z_scan_and_fly(*args, extra_dets=None, **kwargs):
