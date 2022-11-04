@@ -195,6 +195,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     flying_zebra._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
     yield from bps.sleep(1)
 
+    reset_scanner_velocity()
+
     print(f"Ready to start the scan !!!")  ##
 
     @stage_decorator(flying_zebra.detectors)
@@ -207,11 +209,11 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             # yield from bps.wait(group=row_str)
 
             print(f"Start moving to beginning of the row")
-            row_str = short_uid('row')
+            row_mv_to_start = short_uid('row')
             yield from bps.checkpoint()
-            yield from bps.abs_set(xmotor, row_start, group=row_str)
-            yield from bps.abs_set(motor, step, group=row_str)
-            yield from bps.wait(group=row_str)
+            yield from bps.abs_set(xmotor, row_start, group=row_mv_to_start)
+            yield from bps.abs_set(motor, step, group=row_mv_to_start)
+            yield from bps.wait(group=row_mv_to_start)
             # yield from bps.trigger_and_read([temp_nanoKB, motor])  ## Uncomment this
             print(f"Finished moving to the beginning of the row")
             print(f"Fast axis: {xmotor.read()} Slow axis: {motor.read()}")
@@ -339,13 +341,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             toc(t_datacollect, str='  reset scaler')
 
         # trigger all of the detectors
-        row_str = short_uid('row')
+        row_scan = short_uid('row')
         if verbose:
             print('Data collection:')
         for d in flying_zebra.detectors:
             if verbose:
                 print(f'  triggering {d.name}')
-            st = yield from bps.trigger(d, group=row_str)
+            st = yield from bps.trigger(d, group=row_scan)
             st.add_callback(lambda x: toc(t_datacollect, str=f"  status object  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
             if (d.name == 'dexela'):
                 yield from bps.sleep(1)
@@ -363,7 +365,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 # print(args)
                 f.write(json.dumps(kwargs))
                 f.write('\n')
-        st = yield from abs_set(xmotor, row_stop, group=row_str)
+        st = yield from abs_set(xmotor, row_stop, group=row_scan)
         # st.watch(print_watch)
 
         if verbose:
@@ -381,7 +383,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 ttime.sleep(0.001)
             toc(t_datacollect, str='  sclr1 done')
         # wait for the motor and detectors to all agree they are done
-        yield from bps.wait(group=row_str)
+        yield from bps.wait(group=row_scan)
         st.wait()
 
         if verbose:
