@@ -116,25 +116,26 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                     for d in detectors}
 
     # Set up the merlin
-    if 'merlin2' in dets_by_name:
-        dpc = dets_by_name['merlin2']
-        # TODO use stage sigs
-        # Set trigger mode
-        # dpc.cam.trigger_mode.put(2)
-        # Make sure we respect whatever the exposure time is set to
-        if (dwell < 0.0066392):
-            print('The Merlin should not operate faster than 7 ms.')
-            print('Changing the scan dwell time to 7 ms.')
-            dwell = 0.007
-        # According to Ken's comments in hxntools, this is a de-bounce time
-        # when in external trigger mode
-        dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
-        dpc.cam.stage_sigs['acquire_period'] = 0.75 * dwell
-        # dpc.cam.stage_sigs['acquire_period'] = 0.25 * dwell
-        dpc.cam.stage_sigs['num_images'] = 1
-        dpc.stage_sigs['total_points'] = xnum
-        dpc.hdf5.stage_sigs['num_capture'] = xnum
-        del dpc
+    for det_name in ("merlin2", "eiger2"):
+        if det_name in dets_by_name:
+            dpc = dets_by_name[det_name]
+            # TODO use stage sigs
+            # Set trigger mode
+            # dpc.cam.trigger_mode.put(2)
+            # Make sure we respect whatever the exposure time is set to
+            if (dwell < 0.0066392):
+                print('The Merlin should not operate faster than 7 ms.')
+                print('Changing the scan dwell time to 7 ms.')
+                dwell = 0.007
+            # According to Ken's comments in hxntools, this is a de-bounce time
+            # when in external trigger mode
+            dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
+            dpc.cam.stage_sigs['acquire_period'] = 0.75 * dwell
+            # dpc.cam.stage_sigs['acquire_period'] = 0.25 * dwell
+            dpc.cam.stage_sigs['num_images'] = 1
+            dpc.stage_sigs['total_points'] = xnum
+            dpc.hdf5.stage_sigs['num_capture'] = xnum
+            del dpc
 
     # # Setup dexela
     # if ('dexela' in dets_by_name):
@@ -277,11 +278,11 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         #                   xs2.settings.num_images, xnum)
 
         # # Merlin code from the original SRX plan
-        if ('merlin2' in dets_by_name):
-            merlin2 = dets_by_name['merlin2']
-            yield from abs_set(merlin2.hdf5.num_capture, xnum, wait=True)
-            yield from abs_set(merlin2.cam.num_images, xnum, wait=True)
-
+        for det_name in ("merlin2", "eiger2"):
+            if det_name in dets_by_name:
+                dpc = dets_by_name[det_name]
+                yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
+                yield from abs_set(dpc.cam.num_images, xnum, wait=True)
 
         # # Set up HXN Merlin 2 (from 'hxnfly' Flyscan._detector_setup())
         # if ("merlin2" in dets_by_name):
