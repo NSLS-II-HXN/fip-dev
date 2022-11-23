@@ -6,6 +6,8 @@ import sys
 import numpy as np
 from pathlib import PurePath
 import traceback
+from collections import OrderedDict
+from ophyd.areadetector.base import ADComponent
 
 from ophyd import Signal
 from ophyd import Component as Cpt
@@ -171,9 +173,42 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin, EigerFileStoreHDF5):
 
         return super().stage()
 
+    def warmup(self):
+        """
+        A convenience method for 'priming' the plugin.
+
+        The plugin has to 'see' one acquisition before it is ready to capture.
+        This sets the array size, etc.
+        """
+        self.enable.set(1).wait()
+        sigs = OrderedDict(
+            [
+                (self.parent.cam.array_callbacks, 1),
+                (self.parent.cam.image_mode, "Single"),
+                (self.parent.cam.trigger_mode, "Internal Series"),
+                # just in case tha acquisition time is set very long...
+                (self.parent.cam.acquire_time, 1),
+                (self.parent.cam.acquire_period, 1),
+                (self.parent.cam.acquire, 1),
+            ]
+        )
+
+        original_vals = {sig: sig.get() for sig in sigs}
+
+        for sig, val in sigs.items():
+            ttime.sleep(0.1)  # abundance of caution
+            sig.set(val).wait()
+
+        ttime.sleep(2)  # wait for acquisition
+
+        for sig, val in reversed(list(original_vals.items())):
+            ttime.sleep(0.1)
+            sig.set(val).wait()
+
+
 
 class EigerDetectorCam(AreaDetectorCam, CamV33Mixin):
-    pass
+    num_triggers = ADComponent(EpicsSignalWithRBV, 'NumTriggers')
 
 
 class EigerDetector(AreaDetector):
@@ -182,7 +217,7 @@ class EigerDetector(AreaDetector):
               configuration_attrs=['image_mode', 'trigger_mode',
                                    'acquire_time', 'acquire_period'],
               )
-
+              
 
 class SRXEiger(SingleTriggerV33, EigerDetector):
     total_points = Cpt(Signal,
@@ -205,6 +240,7 @@ class SRXEiger(SingleTriggerV33, EigerDetector):
                # write_path_template='/nsls2/data/srx/assets/merlin/%Y/%m/%d/',
                # write_path_template=LARGE_FILE_DIRECTORY_ROOT + '/%Y/%m/%d/',
                write_path_template = LARGE_FILE_DIRECTORY_PATH,
+
                root=LARGE_FILE_DIRECTORY_ROOT)
 
     stats1 = Cpt(StatsPlugin, 'Stats1:')
@@ -244,7 +280,7 @@ class SRXEiger(SingleTriggerV33, EigerDetector):
             # self.stage_sigs[self.cam.acquire_period] = 0.0066392
 
             self.stage_sigs[self.cam.image_mode] = 1  # 0 -single, 1 - multiple
-            self.stage_sigs[self.cam.trigger_mode] = 2  # 0 - internal, 2 - start rising
+            self.stage_sigs[self.cam.trigger_mode] = 3  # 0 - internal, 3 - external enable
 
             self._mode = SRXMode.fly
         else:
@@ -274,8 +310,8 @@ class SRXEiger(SingleTriggerV33, EigerDetector):
 
 
 try:
-    raise Exception("Eiger2 is not configured yet ...")
-    eiger2 = SRXEiger('XF:03IDC-ES{Merlin:2}',
+    # raise Exception("Eiger2 is not configured yet ...")
+    eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
                        read_attrs=['hdf5', 'cam'])
@@ -283,7 +319,7 @@ try:
     eiger2.cam.acquire_period.tolerance = 0.002  # default is 0.001
 
     # Should be set before warmup
-    eiger2.hdf5.nd_array_port.set("MERLIN").wait()
+    eiger2.hdf5.nd_array_port.set("EIG").wait()
 
     eiger2.hdf5.warmup()
 except TimeoutError as ex:

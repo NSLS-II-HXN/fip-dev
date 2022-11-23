@@ -123,10 +123,12 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             # Set trigger mode
             # dpc.cam.trigger_mode.put(2)
             # Make sure we respect whatever the exposure time is set to
-            if (dwell < 0.0066392):
-                print('The Merlin should not operate faster than 7 ms.')
-                print('Changing the scan dwell time to 7 ms.')
-                dwell = 0.007
+
+            # if (dwell < 0.0066392):
+            #     print('The Merlin should not operate faster than 7 ms.')
+            #     print('Changing the scan dwell time to 7 ms.')
+            #     dwell = 0.007
+
             # According to Ken's comments in hxntools, this is a de-bounce time
             # when in external trigger mode
             dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
@@ -248,7 +250,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # Set the scan speed
         # Is abs_set(wait=True) or mv() faster?
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
-        print(f"Forward speed for the fast axis: {v}")
+        print(f"Forward speed for the fast axis: {v} (xnum={xnum} dwell={dwell})")
         # yield from abs_set(xmotor.velocity, v, wait=True)  # set the "stage speed"
         # if (v > xmotor.velocity.high_limit):
         #     raise ValueError(f'Desired motor velocity too high\nMax velocity: {xmotor.velocity.high_limit}')
@@ -278,11 +280,17 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         #                   xs2.settings.num_images, xnum)
 
         # # Merlin code from the original SRX plan
-        for det_name in ("merlin2", "eiger2"):
-            if det_name in dets_by_name:
-                dpc = dets_by_name[det_name]
-                yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
-                yield from abs_set(dpc.cam.num_images, xnum, wait=True)
+        if "merlin2" in dets_by_name:
+            print(f"Configuring 'merlin2' ...")
+            dpc = dets_by_name["merlin2"]
+            yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
+            yield from abs_set(dpc.cam.num_images, xnum, wait=True)
+        if "eiger2" in dets_by_name:
+            print(f"Configuring 'eiger2' ...")
+            dpc = dets_by_name["eiger2"]
+            yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
+            yield from abs_set(dpc.cam.num_triggers, xnum, wait=True)
+            yield from abs_set(dpc.cam.num_images, 1, wait=True)
 
         # # Set up HXN Merlin 2 (from 'hxnfly' Flyscan._detector_setup())
         # if ("merlin2" in dets_by_name):

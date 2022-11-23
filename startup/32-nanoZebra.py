@@ -222,7 +222,7 @@ class SRXFlyer1Axis(Device):
     LARGE_FILE_DIRECTORY_WRITE_PATH = LARGE_FILE_DIRECTORY_PATH
     LARGE_FILE_DIRECTORY_READ_PATH = LARGE_FILE_DIRECTORY_PATH
     LARGE_FILE_DIRECTORY_ROOT = LARGE_FILE_DIRECTORY_ROOT
-    KNOWN_DETS = {"xs", "xs2", "merlin2", "dexela"}
+    KNOWN_DETS = {"xs", "xs2", "merlin2", "eiger2", "dexela"}
     fast_axis = Cpt(Signal, value="HOR", kind="config")
     slow_axis = Cpt(Signal, value="VER", kind="config")
 
