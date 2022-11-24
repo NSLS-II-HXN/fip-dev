@@ -20,7 +20,7 @@ from ophyd.areadetector.plugins import PluginBase
 from ophyd.areadetector.cam import AreaDetectorCam
 from ophyd.device import BlueskyInterface
 from ophyd.utils.epics_pvs import set_and_wait
-from ophyd.areadetector.trigger_mixins import SingleTrigger
+from ophyd.areadetector.trigger_mixins import SingleTrigger, ADTriggerStatus
 from ophyd.areadetector.filestore_mixins import (FileStoreIterativeWrite,
                                                  FileStoreHDF5IterativeWrite,
                                                  FileStoreTIFFSquashing,
@@ -217,9 +217,19 @@ class EigerDetector(AreaDetector):
               configuration_attrs=['image_mode', 'trigger_mode',
                                    'acquire_time', 'acquire_period'],
               )
-              
 
-class SRXEiger(SingleTriggerV33, EigerDetector):
+class EigerTriggerStatus(ADTriggerStatus):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.done:
+            self._target_count = self.device.cam.num_triggers.get()
+
+
+class EigerSingleTriggerV33(SingleTriggerV33):
+    _status_type = EigerTriggerStatus
+
+
+class SRXEiger(EigerSingleTriggerV33, EigerDetector):
     total_points = Cpt(Signal,
                        value=1,
                        doc="The total number of points to be taken")
@@ -333,4 +343,3 @@ except Exception:
           end='\n\n')
     traceback.print_exc()
     print()
-
