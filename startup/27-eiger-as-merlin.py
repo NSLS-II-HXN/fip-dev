@@ -320,7 +320,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
 
 
 try:
-    # raise Exception("Eiger2 is not configured yet ...")
+    raise Exception("Eiger2 is not configured yet ...")
     eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
