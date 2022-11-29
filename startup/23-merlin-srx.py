@@ -61,7 +61,7 @@ class BulkMerlin(BulkXspress):
     def __call__(self, point_number):
         n_first = point_number * self._frame_per_point
         n_last = n_first + self._frame_per_point
-        return self._handle['entry/instrument/detector/data'][n_first:n_last]
+        return self._handle['entry/instrument/detector/data'][n_first:n_last, :, :]
 
 
 class BulkMerlinDebug(BulkXspress):

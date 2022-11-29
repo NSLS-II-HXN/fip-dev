@@ -23,11 +23,14 @@ use_sclr1 = False  # Set this False to run ano zebra without 'sclr1'
 class ZebraHDF5Handler(HandlerBase):
     HANDLER_NAME = "ZEBRA_HDF51_FLY_STREAM_V1"
 
-    def __init__(self, resource_fn):
+    def __init__(self, resource_fn, *, frame_per_point):
+        self._frame_per_point = frame_per_point
         self._handle = h5py.File(resource_fn, "r")
 
-    def __call__(self, *, column):
-        return self._handle[column][:]
+    def __call__(self, *, column, point_number):
+        n_first = point_number * self._frame_per_point
+        n_last = n_first + self._frame_per_point
+        return self._handle[column][n_first:n_last]
 
 
 db.reg.register_handler(ZebraHDF5Handler.HANDLER_NAME, ZebraHDF5Handler, overwrite=True)
@@ -354,6 +357,7 @@ class SRXFlyer1Axis(Device):
         self._document_cache = []
         self._last_bulk = None
 
+        self._point_counter = None
         self.frame_per_point = None
 
     # def ver_fly_plan():
@@ -363,6 +367,7 @@ class SRXFlyer1Axis(Device):
     #     yield from mv(zebar.fast_axis, 'HOR')
     #     yield from _read_fly_scan()
     def stage(self):
+        self._point_counter = 0
         dir = self.fast_axis.get()
         # if dir == "HOR":
         #     self.stage_sigs[self._encoder.pc.enc] = "Enc2"
@@ -397,7 +402,46 @@ class SRXFlyer1Axis(Device):
 
         print(f"stage_sigs={self.stage_sigs}") ##
 
+        self.__filename = "{}.h5".format(uuid.uuid4())
+        self.__filename_sis = "{}.h5".format(uuid.uuid4())
+        self.__read_filepath = os.path.join(
+            self.LARGE_FILE_DIRECTORY_READ_PATH, self.__filename
+        )
+        self.__read_filepath_sis = os.path.join(
+            self.LARGE_FILE_DIRECTORY_READ_PATH, self.__filename_sis
+        )
+        self.__write_filepath = os.path.join(
+            self.LARGE_FILE_DIRECTORY_WRITE_PATH, self.__filename
+        )
+        self.__write_filepath_sis = os.path.join(
+            self.LARGE_FILE_DIRECTORY_WRITE_PATH, self.__filename_sis
+        )
+
+        self.__filestore_resource, self._datum_factory_z = resource_factory(
+            ZebraHDF5Handler.HANDLER_NAME,
+            root=self.LARGE_FILE_DIRECTORY_ROOT,
+            resource_path=self.__read_filepath,
+            resource_kwargs={"frame_per_point": self.frame_per_point},
+            path_semantics="posix",
+        )
+        self.__filestore_resource_sis, self._datum_factory_sis = resource_factory(
+            SISHDF5Handler.HANDLER_NAME,
+            root=self.LARGE_FILE_DIRECTORY_ROOT,
+            resource_path=self.__read_filepath_sis,
+            resource_kwargs={"frame_per_point": self.frame_per_point},
+            path_semantics="posix",
+        )
+
+        resources = [self.__filestore_resource]
+        if self._sis:
+            resources.append(self.__filestore_resource_sis)
+        self._document_cache.extend(("resource", _) for _ in resources)
+
         super().stage()
+
+    def unstage(self):
+        self._point_counter = None
+        super().unstage()
 
     def describe_collect(self):
 
@@ -535,50 +579,15 @@ class SRXFlyer1Axis(Device):
 
         print(f"Complete 4")
 
-        self.__filename = "{}.h5".format(uuid.uuid4())
-        self.__filename_sis = "{}.h5".format(uuid.uuid4())
-        self.__read_filepath = os.path.join(
-            self.LARGE_FILE_DIRECTORY_READ_PATH, self.__filename
-        )
-        self.__read_filepath_sis = os.path.join(
-            self.LARGE_FILE_DIRECTORY_READ_PATH, self.__filename_sis
-        )
-        self.__write_filepath = os.path.join(
-            self.LARGE_FILE_DIRECTORY_WRITE_PATH, self.__filename
-        )
-        self.__write_filepath_sis = os.path.join(
-            self.LARGE_FILE_DIRECTORY_WRITE_PATH, self.__filename_sis
-        )
-
-        self.__filestore_resource, datum_factory_z = resource_factory(
-            ZebraHDF5Handler.HANDLER_NAME,
-            root=self.LARGE_FILE_DIRECTORY_ROOT,
-            resource_path=self.__read_filepath,
-            resource_kwargs={"frame_per_point": self.frame_per_point},
-            path_semantics="posix",
-        )
-        self.__filestore_resource_sis, datum_factory_sis = resource_factory(
-            SISHDF5Handler.HANDLER_NAME,
-            root=self.LARGE_FILE_DIRECTORY_ROOT,
-            resource_path=self.__read_filepath_sis,
-            resource_kwargs={"frame_per_point": self.frame_per_point},
-            path_semantics="posix",
-        )
-
-        time_datum = datum_factory_z({"column": "time"})
-        enc1_datum = datum_factory_z({"column": "enc1"})
-        enc2_datum = datum_factory_z({"column": "enc2"})
-        enc3_datum = datum_factory_z({"column": "enc3"})
+        time_datum = self._datum_factory_z({"column": "time", "point_number": self._point_counter})
+        enc1_datum = self._datum_factory_z({"column": "enc1", "point_number": self._point_counter})
+        enc2_datum = self._datum_factory_z({"column": "enc2", "point_number": self._point_counter})
+        enc3_datum = self._datum_factory_z({"column": "enc3", "point_number": self._point_counter})
         if self._sis:
             sis_mca_names = self._sis_mca_names()
             sis_datum = []
             for name in sis_mca_names:
-                sis_datum.append(datum_factory_sis({"column": name}))
-
-        resources = [self.__filestore_resource]
-        if self._sis:
-            resources.append(self.__filestore_resource_sis)
-        self._document_cache.extend(("resource", _) for _ in resources)
+                sis_datum.append(self._datum_factory_sis({"column": name, "point_number": self._point_counter}))
 
         self._document_cache.extend(
             ("datum", d)
@@ -600,10 +609,7 @@ class SRXFlyer1Axis(Device):
         # Write the file.
         # @timer_wrapper
         def get_zebra_data():
-            if 'nano' in self.name:
-                export_nano_zebra_data(self._encoder, self.__write_filepath, self.fast_axis.get())
-            else:
-                export_zebra_data(self._encoder, self.__write_filepath, self.fast_axis)
+            export_nano_zebra_data(self._encoder, self.__write_filepath, self.fast_axis.get())
 
         if amk_debug_flag:
             t_getzebradata = tic()
@@ -670,6 +676,7 @@ class SRXFlyer1Axis(Device):
                 "the asset registry documents"
             )
         yield self._last_bulk
+        self._point_counter += 1
         self._last_bulk = None
         self._mode = "idle"
 
@@ -769,6 +776,8 @@ caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
 # flying_zebra = SRXFlyer1Axis(zebra)
 
 
+
+
 def export_nano_zebra_data(zebra, filepath, fastaxis):
     j = 0
     while zebra.pc.data_in_progress.get() == 1:
@@ -821,60 +830,32 @@ def export_nano_zebra_data(zebra, filepath, fastaxis):
         # Add half pixelsize to correct encoder
         enc3_d = enc3_d + (px / 2)
 
-    size = (len(time_d),)
-    with h5py.File(filepath, "w") as f:
-        dset0 = f.create_dataset("time", size, dtype="f")
-        dset0[...] = np.array(time_d)
-        dset1 = f.create_dataset("enc1", size, dtype="f")
-        dset1[...] = np.array(enc1_d)
-        dset2 = f.create_dataset("enc2", size, dtype="f")
-        dset2[...] = np.array(enc2_d)
-        dset3 = f.create_dataset("enc3", size, dtype="f")
-        dset3[...] = np.array(enc3_d)
 
+    if not os.path.isfile(filepath):
+        with h5py.File(filepath, "w", libver="latest") as f:
 
-def export_zebra_data(zebra, filepath, fast_axis):
-    print('\n\n\nI am in micro export\n\n\n\n')
-    j = 0
-    while zebra.pc.data_in_progress.get() == 1:
-        print("waiting zebra")
-        ttime.sleep(0.1)
-        j += 1
-        if j > 10:
-            print("THE ZEBRA IS BEHAVING BADLY CARRYING ON")
-            break
+            def create_ds(ds_name,  data):
+                f.create_dataset(ds_name, data=np.asarray(data), maxshape=(None,), dtype="f")
 
-    time_d = zebra.pc.data.time.get()
-    if fast_axis == "HOR":
-        enc1_d = zebra.pc.data.enc2.get()
-        enc2_d = zebra.pc.data.enc1.get()
-    elif fast_axis == "DET2HOR":
-        enc1_d = zebra.pc.data.enc3.get()
-    elif fast_axis == "DET2VER":
-        enc1_d = zebra.pc.data.enc4.get()
+            create_ds("time", time_d)
+            create_ds("enc1", enc1_d)
+            create_ds("enc2", enc2_d)
+            create_ds("enc3", enc3_d)
+
     else:
-        enc1_d = zebra.pc.data.enc1.get()
-        enc2_d = zebra.pc.data.enc2.get()
+        with h5py.File(filepath, "a", libver="latest") as f:
+            n_new_pts = len(time_d)
 
-    enc3_d = 0*enc2_d
+            def add_data(ds_name, data):
+                ds = f[ds_name]
+                n_ds = ds.shape[0]
+                ds.resize((n_ds + n_new_pts,))
+                ds[n_ds:] = np.array(data)
 
-    while len(time_d) == 0 or len(time_d) != len(enc1_d):
-        time_d = zebra.pc.data.time.get()
-        if fast_axis == "HOR":
-            enc1_d = zebra.pc.data.enc2.get()
-        else:
-            enc1_d = zebra.pc.data.enc1.get()
-
-    size = (len(time_d),)
-    with h5py.File(filepath, "w") as f:
-        dset0 = f.create_dataset("time", size, dtype="f")
-        dset0[...] = np.array(time_d)
-        dset1 = f.create_dataset("enc1", size, dtype="f")
-        dset1[...] = np.array(enc1_d)
-        dset2 = f.create_dataset("enc2", size, dtype="f")
-        dset2[...] = np.array(enc2_d)
-        dset3 = f.create_dataset("enc3", size, dtype="f")
-        dset3[...] = np.array(enc3_d)
+            add_data("time", time_d)
+            add_data("enc1", enc1_d)
+            add_data("enc2", enc2_d)
+            add_data("enc3", enc3_d)
 
 
 def export_sis_data(ion, mca_names, filepath, zebra):
