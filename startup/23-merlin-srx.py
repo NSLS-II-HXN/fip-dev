@@ -52,9 +52,16 @@ class BulkXspress(HandlerBase):
         return self._handle["entry/instrument/detector/data"][:]
 
 class BulkMerlin(BulkXspress):
-    HANDLER_NAME = 'MERLIN_FLY_STREAM_V1'
-    def __call__(self):
-        return self._handle['entry/instrument/detector/data'][:]
+    HANDLER_NAME = 'MERLIN_FLY_STREAM_V2'
+
+    def __init__(self, resource_fn, *, frame_per_point):
+        super().__init__(resource_fn)
+        self._frame_per_point = frame_per_point
+
+    def __call__(self, point_number):
+        n_first = point_number * self._frame_per_point
+        n_last = n_first + self._frame_per_point
+        return self._handle['entry/instrument/detector/data'][n_first:n_last]
 
 
 class BulkMerlinDebug(BulkXspress):
@@ -90,12 +97,12 @@ class MerlinFileStoreHDF5(FileStoreBase):
                                 ('num_capture', 0),  # will be updated later
                                 (self.file_template, '%s%s_%6.6d.h5'),
                                 (self.file_write_mode, 'Stream'),
-                                # (self.compression, 'zlib'),
+                                (self.compression, 'zlib'),
                                 (self.capture, 1),
-                                # (self.capture, 0),
                                 ])
 
         self._point_counter = None
+        self.frame_per_point = None
 
     def unstage(self):
         self._point_counter = None
@@ -118,6 +125,9 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
     def generate_datum(self, key, timestamp, datum_kwargs):
         if self.parent._mode is SRXMode.fly:
+            i = next(self._point_counter)
+            datum_kwargs = datum_kwargs or {}
+            datum_kwargs.update({'point_number': i})
             return super().generate_datum(key, timestamp, datum_kwargs)
         elif self.parent._mode is SRXMode.step:
             i = next(self._point_counter)
@@ -147,15 +157,19 @@ class MerlinFileStoreHDF5(FileStoreBase):
                                                filename,
                                                self.file_number.get() - 1)
         self._fp = read_path
+
         if not self.file_path_exists.get():
             raise IOError("Path %s does not exist on IOC."
                           "" % self.file_path.get())
 
+        self._point_counter = itertools.count()
+
         if self.parent._mode is SRXMode.fly:
-            res_kwargs = {}
+            if self.frame_per_point is None:
+                raise ValueError("'frame_per_point' is not set before staging")
+            res_kwargs = {'frame_per_point': self.frame_per_point}
         else:
             res_kwargs = {'frame_per_point': 1}
-            self._point_counter = itertools.count()
 
         logger.debug("Inserting resource with filename %s", self._fn)
         self._generate_resource(res_kwargs)
@@ -271,6 +285,10 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
         finally:
             self._mode = SRXMode.step
         return ret
+
+    def trigger(self):
+        st = super().trigger()
+        return st
 
 
 try:

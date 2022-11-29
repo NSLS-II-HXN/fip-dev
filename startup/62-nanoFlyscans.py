@@ -112,6 +112,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     detectors = (flying_zebra.encoder, flying_zebra.sclr) + flying_zebra.detectors
     detectors = [_ for _ in detectors if _ is not None]
 
+    names_stage_once = ("merlin2",)
+    detectors_stage_once = [_ for _ in flying_zebra.detectors if _.name in names_stage_once]
+    detectors_stage_every_row = [_ for _ in flying_zebra.detectors if _.name not in names_stage_once]
+
+    print(f"detectors_stage_once={detectors_stage_once}")
+    print(f"detectors_stage_every_row={detectors_stage_every_row}")
+
     dets_by_name = {d.name : d
                     for d in detectors}
 
@@ -136,7 +143,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             # dpc.cam.stage_sigs['acquire_period'] = 0.25 * dwell
             dpc.cam.stage_sigs['num_images'] = 1
             dpc.stage_sigs['total_points'] = xnum
-            dpc.hdf5.stage_sigs['num_capture'] = xnum
+            dpc.hdf5.stage_sigs['num_capture'] = xnum * ynum
+            dpc.hdf5.frame_per_point = xnum
             del dpc
 
     # # Setup dexela
@@ -202,7 +210,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     print(f"Ready to start the scan !!!")  ##
 
-    @stage_decorator(flying_zebra.detectors)
+    # @stage_decorator(flying_zebra.detectors)
+    @stage_decorator(detectors_stage_every_row)
     def fly_each_step(motor, step, row_start, row_stop):
         def move_to_start_fly():
             "See http://nsls-ii.github.io/bluesky/plans.html#the-per-step-hook"
@@ -283,12 +292,12 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if "merlin2" in dets_by_name:
             print(f"Configuring 'merlin2' ...")
             dpc = dets_by_name["merlin2"]
-            yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
+            # yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
             yield from abs_set(dpc.cam.num_images, xnum, wait=True)
         if "eiger2" in dets_by_name:
             print(f"Configuring 'eiger2' ...")
             dpc = dets_by_name["eiger2"]
-            yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
+            # yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
             yield from abs_set(dpc.cam.num_triggers, xnum, wait=True)
             yield from abs_set(dpc.cam.num_images, 1, wait=True)
 
@@ -467,13 +476,20 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     else:
         livepopup = []
 
+
+    for d in detectors_stage_once:
+        if d:
+            yield from bps.mov(d.fly_next, True)
+
+
     @subs_decorator(livepopup)
     @subs_decorator({'start': at_scan})
     @subs_decorator({'stop': finalize_scan})
     # monitor values from xs
     # @monitor_during_decorator([xs.channel1.rois.roi01.value])  ## Uncomment this
     # @monitor_during_decorator([xs.channel1.rois.roi01.value, xs.array_counter])
-    @stage_decorator([flying_zebra])  # Below, 'scan' stage ymotor.
+    # @stage_decorator([flying_zebra])  # Below, 'scan' stage ymotor.
+    @stage_decorator([flying_zebra] + detectors_stage_once)  # Below, 'scan' stage ymotor.
     @run_decorator(md=md)
     def plan():
         print("Starting the plan")
@@ -493,7 +509,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             #                    (ynum - ystep) * ( dwell * xnum + 3.8 ) / 3600.)  ## Uncomment this
             # 'arm' the all of the detectors for outputting fly data
             print(f"Starting the next row")
-            for d in flying_zebra.detectors:
+            for d in detectors_stage_every_row:
                 # if d and (d.name != "merlin2"):
                 if d:
                     yield from bps.mov(d.fly_next, True)
