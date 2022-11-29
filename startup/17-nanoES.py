@@ -35,15 +35,21 @@ nano_stage = SRXNanoStage('XF:03IDC-ES{PT:Smpl-Ax:', name='nano_stage')
 
 # nanoKB_interferometer = SRXNanoInterferometer('XF:05IDD-ES:1{PICOSCALE:1}', name='nanoKB_interferometer')
 
-def set_scanner_velocity(velocity=30):
-    # for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
-    for d in [nano_stage.sx, nano_stage.sy]:
-        d.velocity.set(velocity)
+
+# stages_to_move = [nano_stage.sx, nano_stage.sy, nano_stage.sz]
+stages_to_move = [nano_stage.sx, nano_stage.sy]
+velocity_slow = 30
+velocity_fast = 300
+
+def set_scanner_velocity(velocity=velocity_slow):
+    for d in stages_to_move:
+        yield from bps.mv(d.velocity, velocity)
+        # d.velocity.set(velocity).wait()
 
 def reset_scanner_velocity():
-    #for d in [nano_stage.sx, nano_stage.sy, nano_stage.sz]:
-    for d in [nano_stage.sx, nano_stage.sy]:
-        d.velocity.set(300)
+    for d in stages_to_move:
+        yield from bps.mv(d.velocity, velocity_fast)
+        # d.velocity.set(velocity_fast).wait()
 
 
 from datetime import datetime

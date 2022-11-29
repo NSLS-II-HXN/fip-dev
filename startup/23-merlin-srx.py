@@ -176,6 +176,15 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
         return staged
 
+    def pause(self):
+        super().pause()
+
+    def resume(self):
+        self.unstage()
+        self.stage()
+        super().resume()
+
+
 
 class HDF5PluginWithFileStoreMerlin(HDF5Plugin, MerlinFileStoreHDF5):
     def stage(self):
@@ -289,6 +298,15 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
     def trigger(self):
         st = super().trigger()
         return st
+
+    def pause(self):
+        super().pause()
+        self.hdf5.pause()
+
+    def resume(self):
+        super().resume()
+        self.hdf5.resume()
+
 
 
 try:

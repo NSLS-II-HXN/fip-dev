@@ -206,7 +206,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     flying_zebra._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
     yield from bps.sleep(1)
 
-    reset_scanner_velocity()
+    yield from reset_scanner_velocity()
 
     print(f"Ready to start the scan !!!")  ##
 
@@ -223,6 +223,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             print(f"Start moving to beginning of the row")
             row_mv_to_start = short_uid('row')
             yield from bps.checkpoint()
+            yield from reset_scanner_velocity()
             yield from bps.abs_set(xmotor, row_start, group=row_mv_to_start)
             yield from bps.abs_set(motor, step, group=row_mv_to_start)
             yield from bps.wait(group=row_mv_to_start)
@@ -413,7 +414,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         print(f"Resetting scanner velocity")
         # set speed back
-        reset_scanner_velocity()
+        yield from reset_scanner_velocity()
         print(f"Completed resetting scanner velocity")
 
         # @timer_wrapper
@@ -590,7 +591,7 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
     # yield from bps.sleep(1)
-    set_scanner_velocity(30)
+    yield from set_scanner_velocity(30)
     # yield from bps.sleep(1)
     # print("Centering X-axis ...")
     # yield from mv(nano_stage.sx, 0)
