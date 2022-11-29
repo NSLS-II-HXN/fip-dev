@@ -11,7 +11,6 @@ from collections import ChainMap
 from ophyd import Device
 from ophyd.sim import NullStatus
 from ophyd.device import Staged
-from ophyd.areadetector.filestore_mixins import resource_factory
 
 from bluesky.preprocessors import (stage_decorator,
                                    run_decorator, subs_decorator,
@@ -121,6 +120,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     dets_by_name = {d.name : d
                     for d in detectors}
+
+    flying_zebra.frame_per_point = xnum
 
     # Set up the merlin
     for det_name in ("merlin2", "eiger2"):

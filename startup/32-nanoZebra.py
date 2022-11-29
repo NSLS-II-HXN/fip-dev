@@ -12,10 +12,44 @@ from ophyd import Device, EpicsSignal, EpicsSignalRO
 from ophyd import Component as Cpt
 from hxntools.detectors.zebra import Zebra, EpicsSignalWithRBV
 from databroker.assets.handlers import HandlerBase
+from ophyd.areadetector.filestore_mixins import resource_factory
+
 
 xs = None  # No Xspress3
 use_sclr1 = False  # Set this False to run ano zebra without 'sclr1'
 # use_sclr1 = True
+
+
+class ZebraHDF5Handler(HandlerBase):
+    HANDLER_NAME = "ZEBRA_HDF51_FLY_STREAM_V1"
+
+    def __init__(self, resource_fn):
+        self._handle = h5py.File(resource_fn, "r")
+
+    def __call__(self, *, column):
+        return self._handle[column][:]
+
+
+db.reg.register_handler(ZebraHDF5Handler.HANDLER_NAME, ZebraHDF5Handler, overwrite=True)
+
+
+class SISHDF5Handler(HandlerBase):
+    HANDLER_NAME = "SIS_HDF51_FLY_STREAM_V1"
+
+    def __init__(self, resource_fn):
+        self._handle = h5py.File(resource_fn, "r")
+
+    def __call__(self, *, column):
+        return self._handle[column][:]
+
+    def close(self):
+        self._handle.close()
+        self._handle = None
+        super().close()
+
+
+db.reg.register_handler(SISHDF5Handler.HANDLER_NAME, SISHDF5Handler, overwrite=True)
+
 
 # class CurrentPreampZebra(Device):
 #     ch0 = Cpt(EpicsSignalRO, "Cur:I0-I")
@@ -320,6 +354,8 @@ class SRXFlyer1Axis(Device):
         self._document_cache = []
         self._last_bulk = None
 
+        self.frame_per_point = None
+
     # def ver_fly_plan():
     #    yield from mv(zebra.fast_axis, 'VER')
     #    yield from _real_fly_scan()
@@ -515,17 +551,17 @@ class SRXFlyer1Axis(Device):
         )
 
         self.__filestore_resource, datum_factory_z = resource_factory(
-            "ZEBRA_HDF51",
+            ZebraHDF5Handler.HANDLER_NAME,
             root=self.LARGE_FILE_DIRECTORY_ROOT,
             resource_path=self.__read_filepath,
-            resource_kwargs={},
+            resource_kwargs={"frame_per_point": self.frame_per_point},
             path_semantics="posix",
         )
         self.__filestore_resource_sis, datum_factory_sis = resource_factory(
-            "SIS_HDF51",
+            SISHDF5Handler.HANDLER_NAME,
             root=self.LARGE_FILE_DIRECTORY_ROOT,
             resource_path=self.__read_filepath_sis,
-            resource_kwargs={},
+            resource_kwargs={"frame_per_point": self.frame_per_point},
             path_semantics="posix",
         )
 
@@ -880,33 +916,4 @@ def export_sis_data(ion, mca_names, filepath, zebra):
 
 
 
-class ZebraHDF5Handler(HandlerBase):
-    HANDLER_NAME = "ZEBRA_HDF51"
-
-    def __init__(self, resource_fn):
-        self._handle = h5py.File(resource_fn, "r")
-
-    def __call__(self, *, column):
-        return self._handle[column][:]
-
-
-db.reg.register_handler("ZEBRA_HDF51", ZebraHDF5Handler, overwrite=True)
-
-
-class SISHDF5Handler(HandlerBase):
-    HANDLER_NAME = "SIS_HDF51"
-
-    def __init__(self, resource_fn):
-        self._handle = h5py.File(resource_fn, "r")
-
-    def __call__(self, *, column):
-        return self._handle[column][:]
-
-    def close(self):
-        self._handle.close()
-        self._handle = None
-        super().close()
-
-
-db.reg.register_handler("SIS_HDF51", SISHDF5Handler, overwrite=True)
 
