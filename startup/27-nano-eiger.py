@@ -33,9 +33,6 @@ from ophyd.areadetector.filestore_mixins import (FileStoreIterativeWrite,
 
 from nslsii.ad33 import CamV33Mixin, SingleTriggerV33
 
-# from hxntools.detectors.merlin import MerlinDetector
-# from hxntools.handlers import register
-
 import logging
 logger = logging.getLogger('bluesky')
 
@@ -45,39 +42,6 @@ try:
 except ImportError:
     from databroker.assets.handlers import Xspress3HDF5Handler, HandlerBase
 
-# class BulkXspress(HandlerBase):
-#     HANDLER_NAME = "XPS3_FLY"
-#     def __init__(self, resource_fn):
-#         self._handle = h5py.File(resource_fn, "r")
-
-#     def __call__(self):
-#         return self._handle["entry/instrument/detector/data"][:]
-
-# class BulkMerlin(BulkXspress):
-#     HANDLER_NAME = 'MERLIN_FLY_STREAM_V1'
-#     def __call__(self):
-#         return self._handle['entry/instrument/detector/data'][:]
-
-
-# class BulkMerlinDebug(BulkXspress):
-#     # This is for data take in 'capture' mode, only used for debugging
-#     # once.
-#     HANDLER_NAME = 'MERLIN_FLY'
-#     def __call__(self):
-#         return self._handle['entry/instrument/detector/data'][1:]
-
-
-# # needed to get at some debugging data
-# db.reg.register_handler('MERLIN_FLY', BulkMerlinDebug,
-#                         overwrite=True)
-# db.reg.register_handler(BulkMerlin.HANDLER_NAME, BulkMerlin,
-#                         overwrite=True)
-
-# from enum import Enum
-
-# class SRXMode(Enum):
-#     step = 1
-#     fly = 2
 
 class EigerFileStoreHDF5(FileStoreBase):
 

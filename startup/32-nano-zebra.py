@@ -279,7 +279,7 @@ class SRXFlyer1Axis(Device):
 
         self._data_exporter = ExportNanoZebraData()
 
-   def stage(self):
+    def stage(self):
         self._point_counter = 0
         dir = self.fast_axis.get()
         # if dir == "HOR":

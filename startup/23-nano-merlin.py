@@ -1,6 +1,8 @@
 print(f'Loading {__file__}...')
 
+import copy
 import datetime
+from enum import Enum
 import itertools
 import sys
 import numpy as np
@@ -14,7 +16,7 @@ from ophyd.areadetector import (AreaDetector, PixiradDetectorCam, ImagePlugin,
                                 TIFFPlugin, StatsPlugin, HDF5Plugin,
                                 ProcessPlugin, ROIPlugin, TransformPlugin,
                                 OverlayPlugin)
-from ophyd.areadetector.plugins import PluginBase
+from ophyd.areadetector.plugins import PluginBase, HDF5Plugin_V33
 from ophyd.areadetector.cam import AreaDetectorCam
 from ophyd.device import BlueskyInterface
 from ophyd.utils.epics_pvs import set_and_wait
@@ -31,9 +33,6 @@ from ophyd.areadetector.filestore_mixins import (FileStoreIterativeWrite,
 
 from nslsii.ad33 import CamV33Mixin, SingleTriggerV33
 
-# from hxntools.detectors.merlin import MerlinDetector
-# from hxntools.handlers import register
-
 import logging
 logger = logging.getLogger('bluesky')
 
@@ -43,6 +42,7 @@ try:
 except ImportError:
     from databroker.assets.handlers import Xspress3HDF5Handler, HandlerBase
 
+
 class BulkXspress(HandlerBase):
     HANDLER_NAME = "XPS3_FLY"
     def __init__(self, resource_fn):
@@ -51,34 +51,23 @@ class BulkXspress(HandlerBase):
     def __call__(self):
         return self._handle["entry/instrument/detector/data"][:]
 
-class BulkMerlin(BulkXspress):
+
+class BulkMerlin(HandlerBase):
     HANDLER_NAME = 'MERLIN_FLY_STREAM_V2'
 
     def __init__(self, resource_fn, *, frame_per_point):
-        super().__init__(resource_fn)
         self._frame_per_point = frame_per_point
+        self._handle = h5py.File(resource_fn, "r", libver='latest', swmr=True)
 
     def __call__(self, point_number):
         n_first = point_number * self._frame_per_point
         n_last = n_first + self._frame_per_point
-        return self._handle['entry/instrument/detector/data'][n_first:n_last, :, :]
+        ds = self._handle['entry/instrument/detector/data']
+        ds.id.refresh()
+        return ds[n_first:n_last, :, :]
 
 
-class BulkMerlinDebug(BulkXspress):
-    # This is for data take in 'capture' mode, only used for debugging
-    # once.
-    HANDLER_NAME = 'MERLIN_FLY'
-    def __call__(self):
-        return self._handle['entry/instrument/detector/data'][1:]
-
-
-# needed to get at some debugging data
-db.reg.register_handler('MERLIN_FLY', BulkMerlinDebug,
-                        overwrite=True)
-db.reg.register_handler(BulkMerlin.HANDLER_NAME, BulkMerlin,
-                        overwrite=True)
-
-from enum import Enum
+db.reg.register_handler(BulkMerlin.HANDLER_NAME, BulkMerlin,  overwrite=True)
 
 class SRXMode(Enum):
     step = 1
@@ -139,6 +128,9 @@ class MerlinFileStoreHDF5(FileStoreBase):
         # Make a filename.
         filename, read_path, write_path = self.make_filename()
 
+        if self.frame_per_point:
+            self.stage_sigs[self.num_frames_flush] = self.frame_per_point
+
         # Ensure we do not have an old file open.
         set_and_wait(self.capture, 0)
         # These must be set before parent is staged (specifically
@@ -178,19 +170,33 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
     def pause(self):
         super().pause()
+        self.unstage()
 
     def resume(self):
-        self.unstage()
         self.stage()
         super().resume()
 
 
+class HDF5PluginWithFileStoreMerlin(HDF5Plugin_V33, MerlinFileStoreHDF5):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class HDF5PluginWithFileStoreMerlin(HDF5Plugin, MerlinFileStoreHDF5):
+        # 'swmr_mode' must be set first. Rearrange 'stage_sigs'.
+        ss = copy.copy(self.stage_sigs)
+        self.stage_sigs.clear()
+        self.stage_sigs[self.swmr_mode] = 1
+        self.stage_sigs[self.num_frames_flush] = 1  # Set later
+
+        self.stage_sigs.update(ss)
+
+
     def stage(self):
         if np.array(self.array_size.get()).sum() == 0:
             raise Exception("you must warmup the hdf plugin via the `warmup()` "
                             "method on the hdf5 plugin.")
+
+        if self.frame_per_point:
+            self.stage_sigs[self.num_frames_flush] = self.frame_per_point
 
         return super().stage()
 
@@ -318,7 +324,8 @@ try:
     merlin2.cam.acquire_period.tolerance = 0.002  # default is 0.001
 
     # Should be set before warmup
-    merlin2.hdf5.nd_array_port.set("MERLIN").wait()
+    # merlin2.hdf5.nd_array_port.set("MERLIN").wait()
+    merlin2.hdf5.nd_array_port.set("ROI1").wait()
 
     merlin2.hdf5.warmup()
 except TimeoutError as ex:
