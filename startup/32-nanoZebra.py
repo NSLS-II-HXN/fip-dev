@@ -25,12 +25,14 @@ class ZebraHDF5Handler(HandlerBase):
 
     def __init__(self, resource_fn, *, frame_per_point):
         self._frame_per_point = frame_per_point
-        self._handle = h5py.File(resource_fn, "r")
+        self._handle = h5py.File(resource_fn, "r", libver='latest', swmr=True)
 
     def __call__(self, *, column, point_number):
         n_first = point_number * self._frame_per_point
         n_last = n_first + self._frame_per_point
-        return self._handle[column][n_first:n_last]
+        ds = self._handle[column]
+        ds.id.refresh()
+        return ds[n_first:n_last]
 
 
 db.reg.register_handler(ZebraHDF5Handler.HANDLER_NAME, ZebraHDF5Handler, overwrite=True)
@@ -40,7 +42,7 @@ class SISHDF5Handler(HandlerBase):
     HANDLER_NAME = "SIS_HDF51_FLY_STREAM_V1"
 
     def __init__(self, resource_fn):
-        self._handle = h5py.File(resource_fn, "r")
+        self._handle = h5py.File(resource_fn, "r", libver='latest', swmr=True)
 
     def __call__(self, *, column):
         return self._handle[column][:]
@@ -53,82 +55,6 @@ class SISHDF5Handler(HandlerBase):
 
 db.reg.register_handler(SISHDF5Handler.HANDLER_NAME, SISHDF5Handler, overwrite=True)
 
-
-# class CurrentPreampZebra(Device):
-#     ch0 = Cpt(EpicsSignalRO, "Cur:I0-I")
-#     ch1 = Cpt(EpicsSignalRO, "Cur:I1-I")
-#     ch2 = Cpt(EpicsSignalRO, "Cur:I2-I")
-#     ch3 = Cpt(EpicsSignalRO, "Cur:I3-I")
-
-#     # exp_time = Cpt(EpicsSignal, 'Per-SP')
-#     exp_time = Cpt(
-#         EpicsSignal, "XF:05IDD-ES:1{Dev:Zebra1}:PULSE3_WID", add_prefix=()
-#     )
-#     trigger_mode = Cpt(EpicsSignal, "Cmd:TrigMode")
-#     initi_trigger = Cpt(EpicsSignal, "Cmd:Init")
-#     zebra_trigger = Cpt(
-#         EpicsSignal, "XF:05IDD-ES:1{Dev:Zebra1}:SOFT_IN:B0", add_prefix=()
-#     )
-#     zebra_pulse_3_source = Cpt(
-#         EpicsSignal, "XF:05IDD-ES:1{Dev:Zebra1}:PULSE3_INP", add_prefix=()
-#     )
-
-#     current_scan_rate = Cpt(EpicsSignal, "Cmd:RdCur.SCAN")
-
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.stage_sigs[self.zebra_trigger] = 0
-#         #        self.stage_sigs[self.zebra_pulse_3_source] = 44
-#         self.stage_sigs[self.zebra_pulse_3_source] = 60
-
-#         self.current_scan_rate.put(9)
-#         # update
-#         # self.trigger_mode.put(5)
-#         self.stage_sigs[self.trigger_mode] = 5  # fix this
-#         self.initi_trigger.put(1, wait=True)
-
-#     def stage(self):
-
-#         # Customize what is done before every scan (and undone at the end)
-#         # self.stage_sigs[self.trans_diode] = 5
-#         # or just use pyepics directly if you need to
-#         ret = super().stage()
-#         self.initi_trigger.put(1, wait=True)
-#         return ret
-
-#     def trigger(self):
-#         init_ts = self.ch0.timestamp
-#         timeout = float(self.exp_time.get() + 0.8)
-
-#         def retrigger():
-#             print(f"[WW] Re-triggered ion chamber;"
-#                   f"I0 for this point is suspect.")
-#             self.zebra_trigger.put(0, wait=True)
-#             self.zebra_trigger.put(1, wait=True)
-
-#         def done_cb(
-#             *args, obj=None, old_value=None,
-#             value=None, timestamp=None, **kwargs
-#         ):
-#             # if the value has changed, assume it is done
-#             if value != old_value:
-#                 tmr.cancel()
-#                 ret._finished()
-#                 obj.clear_sub(done_cb)
-
-#         tmr = threading.Timer(timeout, retrigger)
-#         tmr.start()
-#         ret = DeviceStatus(self)
-
-#         self.ch0.subscribe(done_cb, event_type=self.ch0.SUB_VALUE, run=False)
-#         self.zebra_trigger.put(0, wait=True)
-#         self.zebra_trigger.put(1, wait=True)
-
-#         return ret
-
-
-# current_preamp = CurrentPreampZebra("XF:05IDA{IM:1}", name="current_preamp")
-# current_preamp = CurrentPreamp('XF:05IDA{IM:1}', name='current_preamp')
 
 
 class ZebraPositionCaptureData(Device):
@@ -242,15 +168,6 @@ class SRXZebra(Zebra):
         )
 
 
-# zebra = SRXZebra("XF:05IDD-ES:1{Dev:Zebra1}:", name="zebra")
-# zebra.read_attrs = ["pc.data.enc1", "pc.data.enc2", "pc.data.time"]
-
-# LARGE_FILE_DIRECTORY_PATH = "/nsls2/data/srx/assets/zebra/2021/2021-3/"
-# LARGE_FILE_DIRECTORY_PATH = "/tmp/collected_data"
-
-# import os
-# os.makedirs(LARGE_FILE_DIRECTORY_PATH, exist_ok=True)  # This should not be done in production
-
 
 class SRXFlyer1Axis(Device):
     """
@@ -360,13 +277,9 @@ class SRXFlyer1Axis(Device):
         self._point_counter = None
         self.frame_per_point = None
 
-    # def ver_fly_plan():
-    #    yield from mv(zebra.fast_axis, 'VER')
-    #    yield from _real_fly_scan()
-    # def hor_fly_plan():
-    #     yield from mv(zebar.fast_axis, 'HOR')
-    #     yield from _read_fly_scan()
-    def stage(self):
+        self._data_exporter = ExportNanoZebraData()
+
+   def stage(self):
         self._point_counter = 0
         dir = self.fast_axis.get()
         # if dir == "HOR":
@@ -437,10 +350,13 @@ class SRXFlyer1Axis(Device):
             resources.append(self.__filestore_resource_sis)
         self._document_cache.extend(("resource", _) for _ in resources)
 
+        self._data_exporter.open(self.__write_filepath)
+
         super().stage()
 
     def unstage(self):
         self._point_counter = None
+        self._data_exporter.close()
         super().unstage()
 
     def describe_collect(self):
@@ -609,7 +525,7 @@ class SRXFlyer1Axis(Device):
         # Write the file.
         # @timer_wrapper
         def get_zebra_data():
-            export_nano_zebra_data(self._encoder, self.__write_filepath, self.fast_axis.get())
+            self._data_exporter.export(self._encoder, self.fast_axis.get())
 
         if amk_debug_flag:
             t_getzebradata = tic()
@@ -705,157 +621,102 @@ class SRXFlyer1Axis(Device):
         self.unstage()
         self.stage()
 
-# For microES
-#try:
-#    # flying_zebra = SRXFlyer1Axis(
-#    #     list(xs for xs in [xs] if xs is not None), sclr1, name="flying_zebra"
-#    # )
-#    raise Exception
-#    microZebra = SRXZebra("XF:03IDC-ES{Zeb:3}:", name="microZebra",
-#        read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.time"],
-#    )
-#    flying_zebra = SRXFlyer1Axis(
-#        list(xs for xs in [xs] if xs is not None), sclr1, microZebra, name="flying_zebra"
-#    )
-#    # print('huge success!')
-#except Exception as ex:
-#    print("Cannot connect to microZebra. Continuing without device.\n", ex)
-#    flying_zebra = None
+
+class ExportNanoZebraData:
+    def __init__(self):
+        self._fp = None
+        self._filepath = None
+
+    def open(self, filepath):
+        self.close()
+        self._filepath = filepath
+        self._fp = h5py.File(filepath, "w", libver="latest")
+
+        self._fp.swmr_mode = True
+
+        def create_ds(ds_name):
+            ds = self._fp.create_dataset(ds_name, data=np.array([], dtype="f"), maxshape=(None,), dtype="f")
+
+        for ds_name in ("time", "enc1", "enc2", "enc3"):
+            create_ds(ds_name)
+
+        self._fp.flush()
+
+    def close(self):
+        if self._fp:
+            self._fp.close()
+            self._fp = None
+
+    def __del__(self):
+        self.close()
+
+    def export(self, zebra, fastaxis):
+        j = 0
+        while zebra.pc.data_in_progress.get() == 1:
+            print("Waiting for zebra...")
+            ttime.sleep(0.1)
+            j += 1
+            if j > 10:
+                print("THE ZEBRA IS BEHAVING BADLY CARRYING ON")
+                break
 
 
-# For nanoES
-try:
-    nanoZebra = SRXZebra("XF:03IDC-ES{Zeb:3}:", name="nanoZebra",
-        read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.enc3", "pc.data.time"],
-    )
-    nano_flying_zebra = SRXFlyer1Axis(
-        list(xs for xs in [xs] if xs is not None), sclr1 if use_sclr1 else None, nanoZebra, name="nano_flying_zebra"
-    )
-    # print('huge success!')
-except Exception as ex:
-    print("Cannot connect to nanoZebra. Continuing without device.\n", ex)
-    nano_flying_zebra = None
+        pxsize = zebra.pc.pulse_step.get()  # Pixel size
+        encoder = zebra.pc.enc.get(as_string=True)  # Encoder ('Enc1', 'Enc2' or 'Enc3')
+
+        print(f"Loading from Zebra: time")
+        time_d = zebra.pc.data.time.get()
+        print(f"Loading from Zebra: enc1")
+        enc1_d = zebra.pc.data.enc1.get()
+        print(f"Loading from Zebra: enc2")
+        enc2_d = zebra.pc.data.enc2.get()
+        print(f"Loading from Zebra: enc3")
+        enc3_d = zebra.pc.data.enc3.get()
+
+        # Correction for the encoder values so that they represent the centers of the bins
+        if encoder.lower() == "enc1":
+            enc1_d += pxsize / 2
+        elif encoder.lower() == "enc2":
+            enc2_d += pxsize / 2
+        elif encoder.lower() == "enc3":
+            enc3_d += pxsize / 2
+        else:
+            print(f"Unrecognized encoder name: {encoder}")
+
+        print(f"===================================================")
+        print(f"COLLECTED DATA:")
+        print(f"time_d={time_d}")
+        print(f"enc1_d={enc1_d}")
+        print(f"enc2_d={enc2_d}")
+        print(f"enc3_d={enc3_d}")
+        print(f"===================================================")
+
+        px = zebra.pc.pulse_step.get()
+        if fastaxis == 'NANOHOR':
+            # Add half pixelsize to correct encoder
+            enc1_d = enc1_d + (px / 2)
+        elif fastaxis == 'NANOVER':
+            # Add half pixelsize to correct encoder
+            enc2_d = enc2_d + (px / 2)
+        elif fastaxis == 'NANOZ':
+            # Add half pixelsize to correct encoder
+            enc3_d = enc3_d + (px / 2)
 
 
-# Enable capture for 'enc1', 'enc2' and 'enc3'. At SRX capture is enabled via CSS.
-caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
-caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
-caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
-# print(f'PC_BIT_CAP:B0 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0")}')
-# print(f'PC_BIT_CAP:B1 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1")}')
-# print(f'PC_BIT_CAP:B2 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2")}')
+        n_new_pts = len(time_d)
 
-# For confocal
-# For plans that call xs2,
-# should we simply add xs2 to flying_zebra.dets
-# and set dir to 'DET2HOR'?
-# if xs2 is not None:
-#     # flying_zebra_x_xs2 = SRXFlyer1Axis(
-#     #     zebra, [xs2], sclr1, "HOR", name="flying_zebra_x_xs2"
-#     # )
-#     # flying_zebra_y_xs2 = SRXFlyer1Axis(
-#     #     zebra, [xs2], sclr1, "VER", name="flying_zebra_y_xs2"
-#     # )
-#     flying_zebra_xs2 = SRXFlyer1Axis(
-#         list(xs2 for xs2 in [xs2] if xs2 is not None),
-#         sclr1,
-#         nanoZebra,
-#         name="flying_zebra_xs2"
-#     )
-#
-# else:
-#     flying_zebra_xs2 = None
-#     # flying_zebra_y_xs2 = None
-# For chip imaging
-# flying_zebra_x_xs2 = SRXFlyer1Axis(
-#   zebra, xs2, sclr1, 'DET2HOR', name='flying_zebra'
-# )
-# flying_zebra_y_xs2 = SRXFlyer1Axis(
-#   zebra, xs2, sclr1, 'DET2VER', name='flying_zebra'
-# )
-# flying_zebra = SRXFlyer1Axis(zebra)
+        def add_data(ds_name, data):
+            ds = self._fp[ds_name]
+            n_ds = ds.shape[0]
+            ds.resize((n_ds + n_new_pts,))
+            ds[n_ds:] = np.array(data)
 
+        add_data("time", time_d)
+        add_data("enc1", enc1_d)
+        add_data("enc2", enc2_d)
+        add_data("enc3", enc3_d)
 
-
-
-def export_nano_zebra_data(zebra, filepath, fastaxis):
-    j = 0
-    while zebra.pc.data_in_progress.get() == 1:
-        print("Waiting for zebra...")
-        ttime.sleep(0.1)
-        j += 1
-        if j > 10:
-            print("THE ZEBRA IS BEHAVING BADLY CARRYING ON")
-            break
-
-
-    pxsize = zebra.pc.pulse_step.get()  # Pixel size
-    encoder = zebra.pc.enc.get(as_string=True)  # Encoder ('Enc1', 'Enc2' or 'Enc3')
-
-    print(f"Loading from Zebra: time")
-    time_d = zebra.pc.data.time.get()
-    print(f"Loading from Zebra: enc1")
-    enc1_d = zebra.pc.data.enc1.get()
-    print(f"Loading from Zebra: enc2")
-    enc2_d = zebra.pc.data.enc2.get()
-    print(f"Loading from Zebra: enc3")
-    enc3_d = zebra.pc.data.enc3.get()
-
-    # Correction for the encoder values so that they represent the centers of the bins
-    if encoder.lower() == "enc1":
-        enc1_d += pxsize / 2
-    elif encoder.lower() == "enc2":
-        enc2_d += pxsize / 2
-    elif encoder.lower() == "enc3":
-        enc3_d += pxsize / 2
-    else:
-        print(f"Unrecognized encoder name: {encoder}")
-
-    print(f"===================================================")
-    print(f"COLLECTED DATA:")
-    print(f"time_d={time_d}")
-    print(f"enc1_d={enc1_d}")
-    print(f"enc2_d={enc2_d}")
-    print(f"enc3_d={enc3_d}")
-    print(f"===================================================")
-
-    px = zebra.pc.pulse_step.get()
-    if fastaxis == 'NANOHOR':
-        # Add half pixelsize to correct encoder
-        enc1_d = enc1_d + (px / 2)
-    elif fastaxis == 'NANOVER':
-        # Add half pixelsize to correct encoder
-        enc2_d = enc2_d + (px / 2)
-    elif fastaxis == 'NANOZ':
-        # Add half pixelsize to correct encoder
-        enc3_d = enc3_d + (px / 2)
-
-
-    if not os.path.isfile(filepath):
-        with h5py.File(filepath, "w", libver="latest") as f:
-
-            def create_ds(ds_name,  data):
-                f.create_dataset(ds_name, data=np.asarray(data), maxshape=(None,), dtype="f")
-
-            create_ds("time", time_d)
-            create_ds("enc1", enc1_d)
-            create_ds("enc2", enc2_d)
-            create_ds("enc3", enc3_d)
-
-    else:
-        with h5py.File(filepath, "a", libver="latest") as f:
-            n_new_pts = len(time_d)
-
-            def add_data(ds_name, data):
-                ds = f[ds_name]
-                n_ds = ds.shape[0]
-                ds.resize((n_ds + n_new_pts,))
-                ds[n_ds:] = np.array(data)
-
-            add_data("time", time_d)
-            add_data("enc1", enc1_d)
-            add_data("enc2", enc2_d)
-            add_data("enc3", enc3_d)
+        self._fp.flush()
 
 
 def export_sis_data(ion, mca_names, filepath, zebra):
@@ -894,6 +755,28 @@ def export_sis_data(ion, mca_names, filepath, zebra):
             dset[...] = np.asarray(mca_data[n])
 
     print(f"FINISHED EXPORTING SCALER DATA")
+
+
+try:
+    nanoZebra = SRXZebra("XF:03IDC-ES{Zeb:3}:", name="nanoZebra",
+        read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.enc3", "pc.data.time"],
+    )
+    nano_flying_zebra = SRXFlyer1Axis(
+        list(xs for xs in [xs] if xs is not None), sclr1 if use_sclr1 else None, nanoZebra, name="nano_flying_zebra"
+    )
+    # print('huge success!')
+except Exception as ex:
+    print("Cannot connect to nanoZebra. Continuing without device.\n", ex)
+    nano_flying_zebra = None
+
+
+# Enable capture for 'enc1', 'enc2' and 'enc3'. At SRX capture is enabled via CSS.
+caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
+caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
+caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
+# print(f'PC_BIT_CAP:B0 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0")}')
+# print(f'PC_BIT_CAP:B1 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1")}')
+# print(f'PC_BIT_CAP:B2 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2")}')
 
 
 
