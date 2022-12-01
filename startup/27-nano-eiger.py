@@ -56,12 +56,12 @@ class EigerFileStoreHDF5(FileStoreBase):
                                 ('num_capture', 0),  # will be updated later
                                 (self.file_template, '%s%s_%6.6d.h5'),
                                 (self.file_write_mode, 'Stream'),
-                                # (self.compression, 'zlib'),
+                                (self.compression, 'zlib'),
                                 (self.capture, 1),
-                                # (self.capture, 0),
                                 ])
 
         self._point_counter = None
+        self.frame_per_point = None
 
     def unstage(self):
         self._point_counter = None
@@ -84,6 +84,9 @@ class EigerFileStoreHDF5(FileStoreBase):
 
     def generate_datum(self, key, timestamp, datum_kwargs):
         if self.parent._mode is SRXMode.fly:
+            i = next(self._point_counter)
+            datum_kwargs = datum_kwargs or {}
+            datum_kwargs.update({'point_number': i})
             return super().generate_datum(key, timestamp, datum_kwargs)
         elif self.parent._mode is SRXMode.step:
             i = next(self._point_counter)
@@ -113,29 +116,67 @@ class EigerFileStoreHDF5(FileStoreBase):
                                                filename,
                                                self.file_number.get() - 1)
         self._fp = read_path
+        
         if not self.file_path_exists.get():
-            raise IOError("Path %s does not exist on IOC."
-                          "" % self.file_path.get())
+            raise IOError("Path %s does not exist on IOC." % self.file_path.get())
+
+        self._point_counter = itertools.count()
 
         if self.parent._mode is SRXMode.fly:
-            res_kwargs = {}
+            if self.frame_per_point is None:
+                raise ValueError("'frame_per_point' is not set before staging")
+            res_kwargs = {'frame_per_point': self.frame_per_point}
         else:
             res_kwargs = {'frame_per_point': 1}
-            self._point_counter = itertools.count()
 
         logger.debug("Inserting resource with filename %s", self._fn)
         self._generate_resource(res_kwargs)
 
         return staged
 
+    def pause(self):
+        super().pause()
+        self.unstage()
 
-class HDF5PluginWithFileStoreEiger(HDF5Plugin, EigerFileStoreHDF5):
+    def resume(self):
+        self.stage()
+        super().resume()
+
+
+class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # 'swmr_mode' must be set first. Rearrange 'stage_sigs'.
+        self.stage_sigs[self.swmr_mode] = 1
+        self.stage_sigs[self.num_frames_flush] = 1  # Set later
+        self.stage_sigs.move_to_end(self.num_frames_flush, last=False)
+        self.stage_sigs.move_to_end(self.swmr_mode, last=False)
+
     def stage(self):
         if np.array(self.array_size.get()).sum() == 0:
             raise Exception("you must warmup the hdf plugin via the `warmup()` "
                             "method on the hdf5 plugin.")
 
+        if self.frame_per_point:
+            self.stage_sigs[self.num_frames_flush] = self.frame_per_point
+
         return super().stage()
+
+    def describe(self):
+        desc = super().describe()
+
+        # Replace the shape for 'merlin2_image'. Height and width should be acquired directly
+        # from HDF5 plugin, since the size of the image could be restricted by ROI.
+        for k, v in desc.items():
+            if k.endswith("_image") and ("shape" in v) and (len(v["shape"]) >= 2):
+                height = self.height.get()
+                width = self.width.get()
+                orig_shape = v["shape"]
+                v["shape"] = orig_shape[:-2] + (height, width)
+                print(f"Descriptor: shape of {k!r} was updated. The shape {orig_shape} was replaced by {v['shape']}")
+
+        return desc
 
     def warmup(self):
         """
@@ -282,6 +323,14 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
             self._mode = SRXMode.step
         return ret
 
+    def pause(self):
+        super().pause()
+        self.hdf5.pause()
+
+    def resume(self):
+        super().resume()
+        self.hdf5.resume()
+
 
 try:
     raise Exception("Eiger2 is not configured yet ...")
@@ -294,6 +343,7 @@ try:
 
     # Should be set before warmup
     eiger2.hdf5.nd_array_port.set("EIG").wait()
+    # eiger2.hdf5.nd_array_port.set("ROI1").wait()
 
     eiger2.hdf5.warmup()
 except TimeoutError as ex:

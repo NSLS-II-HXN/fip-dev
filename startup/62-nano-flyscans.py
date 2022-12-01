@@ -111,7 +111,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     detectors = (flying_zebra.encoder, flying_zebra.sclr) + flying_zebra.detectors
     detectors = [_ for _ in detectors if _ is not None]
 
-    names_stage_once = ("merlin2",)
+    names_stage_once = ("merlin2", "eiger2")
     detectors_stage_once = [_ for _ in flying_zebra.detectors if _.name in names_stage_once]
     detectors_stage_every_row = [_ for _ in flying_zebra.detectors if _.name not in names_stage_once]
 

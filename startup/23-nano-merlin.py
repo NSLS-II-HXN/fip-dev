@@ -151,8 +151,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
         self._fp = read_path
 
         if not self.file_path_exists.get():
-            raise IOError("Path %s does not exist on IOC."
-                          "" % self.file_path.get())
+            raise IOError("Path %s does not exist on IOC." % self.file_path.get())
 
         self._point_counter = itertools.count()
 
@@ -313,10 +312,6 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
         finally:
             self._mode = SRXMode.step
         return ret
-
-    def trigger(self):
-        st = super().trigger()
-        return st
 
     def pause(self):
         super().pause()
