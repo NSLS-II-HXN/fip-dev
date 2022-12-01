@@ -182,12 +182,10 @@ class HDF5PluginWithFileStoreMerlin(HDF5Plugin_V33, MerlinFileStoreHDF5):
         super().__init__(*args, **kwargs)
 
         # 'swmr_mode' must be set first. Rearrange 'stage_sigs'.
-        ss = copy.copy(self.stage_sigs)
-        self.stage_sigs.clear()
         self.stage_sigs[self.swmr_mode] = 1
         self.stage_sigs[self.num_frames_flush] = 1  # Set later
-
-        self.stage_sigs.update(ss)
+        self.stage_sigs.move_to_end(self.num_frames_flush, last=False)
+        self.stage_sigs.move_to_end(self.swmr_mode, last=False)
 
 
     def stage(self):
@@ -199,6 +197,21 @@ class HDF5PluginWithFileStoreMerlin(HDF5Plugin_V33, MerlinFileStoreHDF5):
             self.stage_sigs[self.num_frames_flush] = self.frame_per_point
 
         return super().stage()
+
+    def describe(self):
+        desc = super().describe()
+
+        # Replace the shape for 'merlin2_image'. Height and width should be acquired directly
+        # from HDF5 plugin, since the size of the image could be restricted by ROI.
+        for k, v in desc.items():
+            if k.endswith("_image") and ("shape" in v) and (len(v["shape"]) >= 2):
+                height = self.height.get()
+                width = self.width.get()
+                orig_shape = v["shape"]
+                v["shape"] = orig_shape[:-2] + (height, width)
+                print(f"Descriptor: shape of {k!r} was updated. The shape {orig_shape} was replaced by {v['shape']}")
+
+        return desc
 
 
 class MerlinDetectorCam(AreaDetectorCam, CamV33Mixin):
@@ -324,8 +337,8 @@ try:
     merlin2.cam.acquire_period.tolerance = 0.002  # default is 0.001
 
     # Should be set before warmup
-    # merlin2.hdf5.nd_array_port.set("MERLIN").wait()
-    merlin2.hdf5.nd_array_port.set("ROI1").wait()
+    merlin2.hdf5.nd_array_port.set("MERLIN").wait()
+    # merlin2.hdf5.nd_array_port.set("ROI1").wait()
 
     merlin2.hdf5.warmup()
 except TimeoutError as ex:
