@@ -116,7 +116,7 @@ class EigerFileStoreHDF5(FileStoreBase):
                                                filename,
                                                self.file_number.get() - 1)
         self._fp = read_path
-        
+
         if not self.file_path_exists.get():
             raise IOError("Path %s does not exist on IOC." % self.file_path.get())
 
@@ -166,14 +166,17 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
     def describe(self):
         desc = super().describe()
 
-        # Replace the shape for 'merlin2_image'. Height and width should be acquired directly
+        # Replace the shape for 'eiger2_image'. Height and width should be acquired directly
         # from HDF5 plugin, since the size of the image could be restricted by ROI.
+        # Number of images is returned as 1, so replace it with the number of triggers (for flyscan).
         for k, v in desc.items():
-            if k.endswith("_image") and ("shape" in v) and (len(v["shape"]) >= 2):
+            if k.endswith("_image") and ("shape" in v):
                 height = self.height.get()
                 width = self.width.get()
+                # Generated shape is valid for flyscan using 'External Enable' triggering mode
+                num_triggers = self.parent.cam.num_triggers.get()
                 orig_shape = v["shape"]
-                v["shape"] = orig_shape[:-2] + (height, width)
+                v["shape"] = (num_triggers, height, width)
                 print(f"Descriptor: shape of {k!r} was updated. The shape {orig_shape} was replaced by {v['shape']}")
 
         return desc
@@ -333,7 +336,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
 
 
 try:
-    raise Exception("Eiger2 is not configured yet ...")
+    # raise Exception("Eiger2 is not configured yet ...")
     eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
@@ -342,8 +345,8 @@ try:
     eiger2.cam.acquire_period.tolerance = 0.002  # default is 0.001
 
     # Should be set before warmup
-    eiger2.hdf5.nd_array_port.set("EIG").wait()
-    # eiger2.hdf5.nd_array_port.set("ROI1").wait()
+    # eiger2.hdf5.nd_array_port.set("EIG").wait()
+    eiger2.hdf5.nd_array_port.set("ROI1").wait()
 
     eiger2.hdf5.warmup()
 except TimeoutError as ex:
