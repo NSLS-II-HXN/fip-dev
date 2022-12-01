@@ -345,8 +345,8 @@ try:
     eiger2.cam.acquire_period.tolerance = 0.002  # default is 0.001
 
     # Should be set before warmup
-    # eiger2.hdf5.nd_array_port.set("EIG").wait()
-    eiger2.hdf5.nd_array_port.set("ROI1").wait()
+    eiger2.hdf5.nd_array_port.set("EIG").wait()
+    # eiger2.hdf5.nd_array_port.set("ROI1").wait()
 
     eiger2.hdf5.warmup()
 except TimeoutError as ex:
