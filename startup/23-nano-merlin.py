@@ -164,7 +164,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
         logger.debug("Inserting resource with filename %s", self._fn)
         self._generate_resource(res_kwargs)
-
+        
         return staged
 
     def pause(self):
@@ -188,6 +188,7 @@ class HDF5PluginWithFileStoreMerlin(HDF5Plugin_V33, MerlinFileStoreHDF5):
 
 
     def stage(self):
+        
         if np.array(self.array_size.get()).sum() == 0:
             raise Exception("you must warmup the hdf plugin via the `warmup()` "
                             "method on the hdf5 plugin.")
@@ -275,6 +276,7 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
 
     def stage(self):
         # do the latching
+        print("Staging Merlin - starting")
         if self.fly_next.get():
             self.fly_next.put(False)
             # According to Ken's comments in hxntools, this is a de-bounce time
@@ -304,7 +306,10 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
 
             self._mode = SRXMode.step
 
-        return super().stage()
+        print("Staging Merlin - superclass")
+        st = super().stage()
+        print("Staging Merlin - finished ")
+        return st
 
     def unstage(self):
         try:

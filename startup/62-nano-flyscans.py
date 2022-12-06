@@ -139,9 +139,16 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
             # According to Ken's comments in hxntools, this is a de-bounce time
             # when in external trigger mode
-            dpc.cam.stage_sigs['acquire_time'] = 0.50 * dwell - 0.0016392
-            dpc.cam.stage_sigs['acquire_period'] = 0.75 * dwell
-            # dpc.cam.stage_sigs['acquire_period'] = 0.25 * dwell
+
+
+            acquire_period = 0.75 * dwell
+            acquire_time = 0.50 * dwell
+            acquire_time = min(acquire_time, acquire_period - 0.0016392) 
+            if acquire_time <= 0:
+                raise ValueError("Acquistion period is too small. Increase dwell time")
+
+            dpc.cam.stage_sigs['acquire_time'] = acquire_time
+            dpc.cam.stage_sigs['acquire_period'] = acquire_period
             dpc.cam.stage_sigs['num_images'] = 1
             dpc.stage_sigs['total_points'] = xnum
             dpc.hdf5.stage_sigs['num_capture'] = xnum * ynum
