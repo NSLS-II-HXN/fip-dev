@@ -180,20 +180,6 @@ class SRXFlyer1Axis(Device):
     fast_axis = Cpt(Signal, value="HOR", kind="config")
     slow_axis = Cpt(Signal, value="VER", kind="config")
 
-    # _encoder = Cpt(
-    #     SRXZebra,
-    #     "XF:05IDD-ES:1{Dev:Zebra1}:",
-    #     name="zebra",
-    #     add_prefix=(),
-    #     read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.time"],
-    # )
-    # _encoder = Cpt(
-    #     SRXZebra,
-    #     self._zebra_pvname,
-    #     name="zebra",
-    #     add_prefix=(),
-    #     read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.time"],
-    # )
     @property
     def encoder(self):
         return self._encoder
@@ -217,8 +203,6 @@ class SRXFlyer1Axis(Device):
     def sclr(self):
         return self._sis
 
-    # def __init__(self, encoder, dets, sclr1, fast_axis, *,
-    #              reg=db.reg, **kwargs):
     def __init__(self, dets, sclr1, zebra, *, reg=db.reg, **kwargs):
         super().__init__("", parent=None, **kwargs)
         self._mode = "idle"
@@ -226,42 +210,13 @@ class SRXFlyer1Axis(Device):
         self._sis = sclr1
         self._filestore_resource = None
         self._encoder = zebra
-        # self._fast_axis = self.fast_axis
-        # _encoder = Cpt(
-        #     SRXZebra,
-        #     zebra_pvname,
-        #     name="zebra",
-        #     add_prefix=(),
-        #     read_attrs=["pc.data.enc1", "pc.data.enc2", "pc.data.time"],
-        # )
-        # print(zebra_pvname)
 
         # # Gating info for encoder capture
         self.stage_sigs[self._encoder.pc.gate_num] = 1
         self.stage_sigs[self._encoder.pc.pulse_start] = 0
 
-        # self.stage_sigs[self._encoder.pulse3.width] = 0.1
-        # self.stage_sigs[self._encoder.pulse4.width] = 0.1
-
-        # # PC gate output is 31 for zebra. Use it to trigger xspress3 and I0
-        # self.stage_sigs[self._encoder.output1.ttl.addr] = 31
-        # self.stage_sigs[self._encoder.output3.ttl.addr] = 31
-
         # This is for the merlin
-        # self.stage_sigs[self._encoder.output2.ttl.addr] = 31
         self.stage_sigs[self._encoder.output1.ttl.addr] = 31
-        # self.stage_sigs[self._encoder.output1.ttl.addr] = 36
-
-        # # self.stage_sigs[self._encoder.output2.ttl.addr] = 53
-        # # This is for the dexela
-        # self.stage_sigs[self._encoder.output4.ttl.addr] = 31
-        # # This is for the xs2
-        # # self.stage_sigs[self._encoder.output4.ttl.addr] = 31
-
-        # self.stage_sigs[self._encoder.pc.enc_pos1_sync] = 1
-        # self.stage_sigs[self._encoder.pc.enc_pos2_sync] = 1
-        # self.stage_sigs[self._encoder.pc.enc_pos3_sync] = 1
-        # self.stage_sigs[self._encoder.pc.enc_pos4_sync] = 1
 
         if self._sis is not None:
             # Put SIS3820 into single count (not autocount) mode
@@ -282,22 +237,6 @@ class SRXFlyer1Axis(Device):
     def stage(self):
         self._point_counter = 0
         dir = self.fast_axis.get()
-        # if dir == "HOR":
-        #     self.stage_sigs[self._encoder.pc.enc] = "Enc2"
-        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
-        #     # self.stage_sigs[self._encoder.pc.enc_res2] = 5e-6
-        # elif dir == "VER":
-        #     self.stage_sigs[self._encoder.pc.enc] = "Enc1"
-        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
-        #     # self.stage_sigs[self._encoder.pc.enc_res1] = 5e-6
-        # elif dir == "DET2HOR":
-        #     self.stage_sigs[self._encoder.pc.enc] = "Enc3"
-        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
-        #     # self.stage_sigs[self._encoder.pc.enc_res1] = 5e-5
-        # elif dir == "DET2VER":
-        #     self.stage_sigs[self._encoder.pc.enc] = "Enc4"
-        #     self.stage_sigs[self._encoder.pc.dir] = "Positive"
-        #     # self.stage_sigs[self._encoder.pc.enc_res1] = 5e-5
         if dir == "NANOHOR":
             self.stage_sigs[self._encoder.pc.enc] = "Enc1"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
@@ -393,13 +332,6 @@ class SRXFlyer1Axis(Device):
 
         dets_by_name = {d.name: d for d in self.detectors}
 
-        ## TODO: Need to make sure zebra is full setup for scan
-        ## pulses2/3/4
-        ## OR logic
-        ## PC on position (NOT TIME!)
-
-        # self.pos1_set = xstart  # IS IT CORRECT OR SETTING self._encoder.pc.enc_pos1_sync.put(1) is sufficient???
-
         self._encoder.pc.arm.put(0)
         self._mode = "kicked off"
         self._npts = int(xnum)
@@ -411,13 +343,11 @@ class SRXFlyer1Axis(Device):
         extent = np.abs(xstop - xstart) + pxsize
         # 2 ms delay between pulses
         decrement = (pxsize / dwell) * 0.0005
-        if decrement < 1e-5:
-            # print('Changing the pulse width')
-            decrement = 1e-5
+        decrement = max(decrement, 1e-5)
+
         print(f"gate_start={xstart - direction * (pxsize/2)}")
         print(f"extent={extent}")
         self._encoder.pc.gate_start.put(xstart - direction * (pxsize / 2))
-        # self._encoder.pc.gate_step.put(extent + 0.051)
         self._encoder.pc.gate_step.put(extent + 0.060)
         self._encoder.pc.gate_width.put(extent + 0.050)
 
@@ -430,39 +360,11 @@ class SRXFlyer1Axis(Device):
         # but integrate over the entire line
         # Hopefully taken care of with decrement check above
 
-        # For dexela, we will use time triggering in a pixel, not position
-        # if "dexela" in dets_by_name:
-        #     self._encoder.output1.ttl.addr.put(52)
-        #     self._encoder.output3.ttl.addr.put(52)
-        #     self._encoder.pulse1.width.put(0.5 * dwell - 0.050)
-        # else:
-        #     self._encoder.output1.ttl.addr.put(31)
-        #     # self._encoder.output3.ttl.addr.put(31)
-        #     self._encoder.output3.ttl.addr.put(36)
-        #     self._encoder.pulse3.input_addr.put(31)
-        #     self._encoder.pulse4.input_addr.put(31)
-
-        # self._encoder.output1.ttl.addr.put(31)
-        # self._encoder.output3.ttl.addr.put(36)
-        # self._encoder.pulse3.input_addr.put(31)
-        # self._encoder.pulse4.input_addr.put(31)
-
-        # print("Synchronizing stage ...")
-        # self._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
-        # self._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
-        # self._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
-        # self._encoder.pc.enc_pos4_sync.put(1)  # None
-
         # Arm the zebra
         self._encoder.pc.arm.put(1)
-        # ttime.sleep(1)
 
-        st = (
-            NullStatus()
-        )
-        # TODO Return a status object *first*
-        # and do the above asynchronously.
-        return st
+        # TODO Return a status object *first* and do the above asynchronously.
+        return NullStatus()
 
     def _sis_mca_names(self):
         n_mcas = n_scaler_mca
@@ -774,9 +676,6 @@ except Exception as ex:
 caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
 caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
 caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
-# print(f'PC_BIT_CAP:B0 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0")}')
-# print(f'PC_BIT_CAP:B1 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1")}')
-# print(f'PC_BIT_CAP:B2 {caget("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2")}')
 
 
 

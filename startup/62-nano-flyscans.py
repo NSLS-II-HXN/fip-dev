@@ -127,19 +127,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     for det_name in ("merlin2", "eiger2"):
         if det_name in dets_by_name:
             dpc = dets_by_name[det_name]
-            # TODO use stage sigs
-            # Set trigger mode
-            # dpc.cam.trigger_mode.put(2)
-            # Make sure we respect whatever the exposure time is set to
-
-            # if (dwell < 0.0066392):
-            #     print('The Merlin should not operate faster than 7 ms.')
-            #     print('Changing the scan dwell time to 7 ms.')
-            #     dwell = 0.007
-
-            # According to Ken's comments in hxntools, this is a de-bounce time
-            # when in external trigger mode
-
 
             acquire_period = 0.75 * dwell
             acquire_time = 0.50 * dwell
@@ -154,13 +141,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             dpc.hdf5.stage_sigs['num_capture'] = xnum * ynum
             dpc.hdf5.frame_per_point = xnum
             del dpc
-
-    # # Setup dexela
-    # if ('dexela' in dets_by_name):
-    #     xrd = dets_by_name['dexela']
-    #     xrd.cam.stage_sigs['acquire_time'] = dwell
-    #     xrd.cam.stage_sigs['acquire_period'] = dwell
-    #     del xrd
 
     # If delta is None, set delta based on time for acceleration
     if delta is None:
@@ -178,8 +158,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # row_stop = xstop + delta + (pxsize / 2)
     row_start = xstart - delta - max(pxsize, 1)
     row_stop = xstop + delta + max(pxsize, 1)
-    # yield from mv(xmotor, row_start,
-    #               ymotor, ystart)
 
     # Run a peakup before the map?
     if (align):
@@ -223,10 +201,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     def fly_each_step(motor, step, row_start, row_stop):
         def move_to_start_fly():
             "See http://nsls-ii.github.io/bluesky/plans.html#the-per-step-hook"
-            # row_str = short_uid('row')
-            # yield from abs_set(xmotor, row_start, group=row_str)
-            # yield from one_1d_step([temp_nanoKB], motor, step)
-            # yield from bps.wait(group=row_str)
 
             print(f"Start moving to beginning of the row")
             row_mv_to_start = short_uid('row')
@@ -243,11 +217,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             t_mvstartfly = tic()
         yield from move_to_start_fly()
 
-        # TODO  Why are we re-trying the move?  This should be fixed at
-        # a lower level
-        # yield from bps.sleep(1.0)  # wait for the "x motor" to move
         x_set = row_start
         x_dial = xmotor.user_readback.get()
+
         # Get retry deadband value and check against that
         i = 0
         DEADBAND = 0.050  # retry deadband of nPoint scanner
@@ -266,16 +238,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             toc(t_mvstartfly, str='Move to start fly each')
 
         # Set the scan speed
-        # Is abs_set(wait=True) or mv() faster?
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
         print(f"Forward speed for the fast axis: {v} (xnum={xnum} dwell={dwell})")
-        # yield from abs_set(xmotor.velocity, v, wait=True)  # set the "stage speed"
-        # if (v > xmotor.velocity.high_limit):
-        #     raise ValueError(f'Desired motor velocity too high\nMax velocity: {xmotor.velocity.high_limit}')
-        # elif (v < xmotor.velocity.low_limit):
-        #     raise ValueError(f'Desired motor velocity too low\nMin velocity: {xmotor.velocity.low_limit}')
-        # else:
-        #     yield from mv(xmotor.velocity, v)
         yield from mv(xmotor.velocity, v)
 
         # set up all of the detectors
@@ -301,43 +265,17 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if "merlin2" in dets_by_name:
             print(f"Configuring 'merlin2' ...")
             dpc = dets_by_name["merlin2"]
-            # yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
             yield from abs_set(dpc.cam.num_images, xnum, wait=True)
         if "eiger2" in dets_by_name:
             print(f"Configuring 'eiger2' ...")
             dpc = dets_by_name["eiger2"]
-            # yield from abs_set(dpc.hdf5.num_capture, xnum, wait=True)
             yield from abs_set(dpc.cam.num_triggers, xnum, wait=True)
             yield from abs_set(dpc.cam.num_images, 1, wait=True)
-
-        # # Set up HXN Merlin 2 (from 'hxnfly' Flyscan._detector_setup())
-        # if ("merlin2" in dets_by_name):
-        #     det = merlin2
-        #     settings = det.mode_settings
-        #     settings.mode.put('external')
-        #     settings.scan_type.put('fly')
-        #     settings.total_points.put(xnum)
-
-        #     print('Staging %s (settings: %s)', det.name, settings.get())
-
-        #     if det._staged == Staged.yes:
-        #         print('Detector %s already staged - restaging', det.name)
-        #         det.unstage()
-
-        #     det.stage()
-
-        # if ('dexela' in dets_by_name):
-        #     dexela = dets_by_name['dexela']
-        #     yield from abs_set(dexela.hdf5.num_capture, xnum, wait=True)
-        #     # yield from abs_set(dexela.hdf5.num_frames_chunks, xnum, wait=True)
-        #     yield from abs_set(dexela.cam.num_images, xnum, wait=True)
 
         ion = flying_zebra.sclr
         if ion:
             yield from abs_set(ion.nuse_all, 2*xnum)
 
-        # arm the Zebra (start caching x positions)
-        # @timer_wrapper
         def zebra_kickoff():
             # start_zebra, stop_zebra = xstart * 1000000, xstop * 1000000
             start_zebra, stop_zebra = xstart, xstop
@@ -349,7 +287,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 yield from kickoff(flying_zebra,
                                    xstart=stop_zebra, xstop=start_zebra, xnum=xnum, dwell=dwell,
                                    wait=True)
-            # yield from bps.sleep(0.1)
 
         if verbose:
             t_zebkickoff = tic()
@@ -359,6 +296,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         if verbose:
             t_datacollect = tic()
+
         # arm SIS3820, note that there is a 1 sec delay in setting X
         # into motion so the first point *in each row* won't
         # normalize...
@@ -494,10 +432,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     @subs_decorator(livepopup)
     @subs_decorator({'start': at_scan})
     @subs_decorator({'stop': finalize_scan})
-    # monitor values from xs
     # @monitor_during_decorator([xs.channel1.rois.roi01.value])  ## Uncomment this
     # @monitor_during_decorator([xs.channel1.rois.roi01.value, xs.array_counter])
-    # @stage_decorator([flying_zebra])  # Below, 'scan' stage ymotor.
     @stage_decorator([flying_zebra] + detectors_stage_once)  # Below, 'scan' stage ymotor.
     @run_decorator(md=md)
     def plan():
@@ -545,17 +481,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             yield from fly_each_step(ymotor, step, start, stop)
             # print('return from step\t',time.time())
             ystep = ystep + 1
-
-        # TODO this should be taken care of by stage sigs
-        # ion = flying_zebra.sclr
-        # if ion:
-        #     yield from bps.mov(xs.external_trig, False,
-        #                        ion.count_mode, 1)
-
-        # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-        # yield from bps.sleep(2)
-
-    # toc(t_setup, str='Setup time')
 
     # Setup the final scan plan
     if shutter:
