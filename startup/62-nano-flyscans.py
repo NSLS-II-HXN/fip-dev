@@ -128,11 +128,17 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if det_name in dets_by_name:
             dpc = dets_by_name[det_name]
 
-            acquire_period = 0.75 * dwell
-            acquire_time = 0.50 * dwell
-            acquire_time = min(acquire_time, acquire_period - 0.0016392) 
-            if acquire_time <= 0:
-                raise ValueError("Acquistion period is too small. Increase dwell time")
+            if det_name == "merlin2":
+                acquire_period = 0.75 * dwell
+                acquire_time = 0.50 * dwell
+                acquire_time = min(acquire_time, acquire_period - 0.0016392)
+                if acquire_time <= 0:
+                    raise ValueError("Acquistion period is too small. Increase dwell time")
+            elif det_name == "eiger2":
+                acquire_time = 0.5 * dwell
+                acquire_period = acquire_time
+            else:
+                raise ValueError(f"Unsupported detector: {det_name!r}")
 
             dpc.cam.stage_sigs['acquire_time'] = acquire_time
             dpc.cam.stage_sigs['acquire_period'] = acquire_period
@@ -274,7 +280,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         ion = flying_zebra.sclr
         if ion:
-            yield from abs_set(ion.nuse_all, 2*xnum)
+            yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         def zebra_kickoff():
             # start_zebra, stop_zebra = xstart * 1000000, xstop * 1000000
@@ -314,8 +320,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 print(f'  triggering {d.name}')
             st = yield from bps.trigger(d, group=row_scan)
             st.add_callback(lambda x: toc(t_datacollect, str=f"  status object  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
-            if (d.name == 'dexela'):
-                yield from bps.sleep(1)
+            if (d.name == 'eiger2'):
+                yield from bps.sleep(0.2)
         if verbose:
             toc(t_datacollect, str='  trigger detectors')
 
@@ -348,8 +354,10 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 ttime.sleep(0.001)
             toc(t_datacollect, str='  sclr1 done')
         # wait for the motor and detectors to all agree they are done
+        print("Waiting for the row scan to complete ...")
         yield from bps.wait(group=row_scan)
-        st.wait()
+        print("Row scan is completed")
+        # st.wait()
 
         if verbose:
             toc(t_datacollect, str='Total time')
@@ -372,7 +380,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if verbose:
             toc(t_zebcomplete, str='Zebra complete')
         print(f"'zebra_complete' finished")
-
 
         # @timer_wrapper
         def zebra_collect():

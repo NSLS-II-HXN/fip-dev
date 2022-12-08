@@ -88,6 +88,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
                                 (self.file_write_mode, 'Stream'),
                                 (self.compression, 'zlib'),
                                 (self.capture, 1),
+                                (self.queue_size, 1000),  # Make the queue large enough
                                 ])
 
         self._point_counter = None
@@ -164,7 +165,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
 
         logger.debug("Inserting resource with filename %s", self._fn)
         self._generate_resource(res_kwargs)
-        
+
         return staged
 
     def pause(self):
@@ -188,7 +189,7 @@ class HDF5PluginWithFileStoreMerlin(HDF5Plugin_V33, MerlinFileStoreHDF5):
 
 
     def stage(self):
-        
+
         if np.array(self.array_size.get()).sum() == 0:
             raise Exception("you must warmup the hdf plugin via the `warmup()` "
                             "method on the hdf5 plugin.")
