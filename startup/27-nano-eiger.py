@@ -221,6 +221,7 @@ class EigerDetectorCam(AreaDetectorCam, CamV33Mixin):
     stream_enable = ADComponent(EpicsSignalWithRBV, 'StreamEnable')
     data_source = ADComponent(EpicsSignalWithRBV, 'DataSource')
     fw_enable = ADComponent(EpicsSignalWithRBV, 'FWEnable')
+    detector_state = ADComponent(EpicsSignalRO, "DetectorState_RBV")
 
 
 class EigerDetector(AreaDetector):
@@ -344,13 +345,15 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
 
 
 try:
-    # raise Exception("Eiger2 is not configured yet ...")
+    raise Exception("Eiger2 is not configured yet ...")
     eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
                        read_attrs=['hdf5', 'cam'])
     eiger2.hdf5.read_attrs = []
     eiger2.cam.acquire_period.tolerance = 0.002  # default is 0.001
+
+    eiger2.hdf5.compression.set("zlib").wait()  # If 'compression' is None, the plan will not start
 
     # Should be set before warmup
     eiger2.hdf5.nd_array_port.set("EIG").wait()

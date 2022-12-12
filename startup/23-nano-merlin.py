@@ -330,6 +330,7 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
 
 
 try:
+    # raise Exception("Merlin is disabled.")
     merlin2 = SRXMerlin('XF:03IDC-ES{Merlin:2}',
                        name='merlin2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])

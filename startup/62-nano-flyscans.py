@@ -165,6 +165,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     row_start = xstart - delta - max(pxsize, 1)
     row_stop = xstop + delta + max(pxsize, 1)
 
+    # row_start, row_stop = xstart - 0.3, xstop + 0.3
+
     # Run a peakup before the map?
     if (align):
         yield from peakup_fine(shutter=shutter)
@@ -320,8 +322,17 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 print(f'  triggering {d.name}')
             st = yield from bps.trigger(d, group=row_scan)
             st.add_callback(lambda x: toc(t_datacollect, str=f"  status object  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
+
+            # if (d.name == 'merlin2'):
             if (d.name == 'eiger2'):
-                yield from bps.sleep(0.2)
+                t_wait_detector = tic()
+                while d.cam.num_images_counter.get() != 0:
+                # while (d.cam.detector_state.get(as_string=True) != "Acquire"):
+                # while not d.cam.acquire.get():
+                    # print("Waiting for detector state")
+                    yield from bps.sleep(0.001)
+                toc(t_wait_detector, str=f'  waiting for detector {d.name!r}')
+                # yield from bps.sleep(0.2)
         if verbose:
             toc(t_datacollect, str='  trigger detectors')
 
