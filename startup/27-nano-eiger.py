@@ -58,7 +58,7 @@ class EigerFileStoreHDF5(FileStoreBase):
                                 (self.file_write_mode, 'Stream'),
                                 (self.compression, 'zlib'),
                                 (self.capture, 1),
-                                (self.queue_size, 1000),  # Make the queue large enough
+                                (self.queue_size, 2000),  # Make the queue large enough
                                 ])
 
         self._point_counter = None
@@ -219,9 +219,11 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
 class EigerDetectorCam(AreaDetectorCam, CamV33Mixin):
     num_triggers = ADComponent(EpicsSignalWithRBV, 'NumTriggers')
     stream_enable = ADComponent(EpicsSignalWithRBV, 'StreamEnable')
+    stream_decompress = ADComponent(EpicsSignalWithRBV, "StreamDecompress")
     data_source = ADComponent(EpicsSignalWithRBV, 'DataSource')
     fw_enable = ADComponent(EpicsSignalWithRBV, 'FWEnable')
     detector_state = ADComponent(EpicsSignalRO, "DetectorState_RBV")
+
 
 
 class EigerDetector(AreaDetector):
@@ -303,6 +305,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
             # self.stage_sigs[self.cam.acquire_period] = 0.0066392
 
             self.stage_sigs[self.cam.stream_enable] = 1  # Enable stream
+            self.stage_sigs[self.cam.stream_decompress] = 1  # We need to enable StreamDecompress for some reason
             self.stage_sigs[self.cam.data_source] = 2    # Data source - stream
             self.stage_sigs[self.cam.fw_enable] = 0      # Disable file writer
 
@@ -345,7 +348,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
 
 
 try:
-    raise Exception("Eiger2 is not configured yet ...")
+    # raise Exception("Eiger2 is not configured yet ...")
     eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])

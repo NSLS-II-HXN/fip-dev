@@ -88,7 +88,7 @@ class MerlinFileStoreHDF5(FileStoreBase):
                                 (self.file_write_mode, 'Stream'),
                                 (self.compression, 'zlib'),
                                 (self.capture, 1),
-                                (self.queue_size, 1000),  # Make the queue large enough
+                                (self.queue_size, 2000),  # Make the queue large enough
                                 ])
 
         self._point_counter = None
@@ -330,7 +330,7 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
 
 
 try:
-    # raise Exception("Merlin is disabled.")
+    raise Exception("Merlin is disabled.")
     merlin2 = SRXMerlin('XF:03IDC-ES{Merlin:2}',
                        name='merlin2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])

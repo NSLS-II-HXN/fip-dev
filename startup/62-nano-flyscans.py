@@ -331,14 +331,17 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 # while not d.cam.acquire.get():
                     # print("Waiting for detector state")
                     yield from bps.sleep(0.001)
-                toc(t_wait_detector, str=f'  waiting for detector {d.name!r}')
                 # yield from bps.sleep(0.2)
+                toc(t_wait_detector, str=f'  waiting for detector {d.name!r}')
+
         if verbose:
             toc(t_datacollect, str='  trigger detectors')
 
         # yield from bps.sleep(1.5)
         if verbose:
             toc(t_datacollect, str='  sleep')
+
+        # yield from bps.sleep(0.5)
 
         # start the 'fly'
         def print_watch(*args, **kwargs):
@@ -364,11 +367,14 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             while (sclr1.acquiring.get()):
                 ttime.sleep(0.001)
             toc(t_datacollect, str='  sclr1 done')
+
         # wait for the motor and detectors to all agree they are done
         print("Waiting for the row scan to complete ...")
         yield from bps.wait(group=row_scan)
         print("Row scan is completed")
         # st.wait()
+
+        # yield from bps.sleep(1)
 
         if verbose:
             toc(t_datacollect, str='Total time')
