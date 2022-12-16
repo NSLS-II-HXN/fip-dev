@@ -54,8 +54,8 @@ class EigerFileStoreHDF5(FileStoreBase):
                                 ('array_counter', 0),
                                 ('auto_save', 'Yes'),
                                 ('num_capture', 0),  # will be updated later
-                                (self.file_template, '%s%s_%6.6d.h5'),
                                 (self.file_write_mode, 'Stream'),
+                                (self.file_template, '%s%s_%6.6d.h5'),
                                 (self.compression, 'zlib'),
                                 (self.capture, 1),
                                 (self.queue_size, 2000),  # Make the queue large enough
@@ -192,10 +192,14 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
         self.enable.set(1).wait()
         sigs = OrderedDict(
             [
+                # (self.file_write_mode, "Capture"),
+                # (self.file_write_mode, "Single"),
                 (self.parent.cam.array_callbacks, 1),
                 (self.parent.cam.image_mode, "Single"),
                 (self.parent.cam.trigger_mode, "Internal Series"),
+                (self.parent.cam.manual_trigger, "Disable"),
                 # just in case tha acquisition time is set very long...
+                (self.parent.cam.num_triggers, 1),
                 (self.parent.cam.acquire_time, 1),
                 (self.parent.cam.acquire_period, 1),
                 (self.parent.cam.acquire, 1),
@@ -217,6 +221,7 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
 
 
 class EigerDetectorCam(AreaDetectorCam, CamV33Mixin):
+    manual_trigger = ADComponent(EpicsSignalWithRBV, "ManualTrigger")  # 'Enable'/'Disable'
     num_triggers = ADComponent(EpicsSignalWithRBV, 'NumTriggers')
     stream_enable = ADComponent(EpicsSignalWithRBV, 'StreamEnable')
     stream_decompress = ADComponent(EpicsSignalWithRBV, "StreamDecompress")
@@ -244,6 +249,7 @@ class EigerSingleTriggerV33(SingleTriggerV33):
     _status_type = EigerTriggerStatus
 
 
+
 class SRXEiger(EigerSingleTriggerV33, EigerDetector):
     total_points = Cpt(Signal,
                        value=1,
@@ -268,11 +274,11 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
 
                root=LARGE_FILE_DIRECTORY_ROOT)
 
-    stats1 = Cpt(StatsPlugin, 'Stats1:')
-    stats2 = Cpt(StatsPlugin, 'Stats2:')
-    stats3 = Cpt(StatsPlugin, 'Stats3:')
-    stats4 = Cpt(StatsPlugin, 'Stats4:')
-    stats5 = Cpt(StatsPlugin, 'Stats5:')
+    stats1 = Cpt(StatsPluginHXN, 'Stats1:')
+    stats2 = Cpt(StatsPluginHXN, 'Stats2:')
+    stats3 = Cpt(StatsPluginHXN, 'Stats3:')
+    stats4 = Cpt(StatsPluginHXN, 'Stats4:')
+    stats5 = Cpt(StatsPluginHXN, 'Stats5:')
     proc1 = Cpt(ProcessPlugin, 'Proc1:')
     transform1 = Cpt(TransformPlugin, 'Trans1:')
 
@@ -312,6 +318,8 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
             self.stage_sigs[self.cam.image_mode] = 1    # 0 -single, 1 - multiple
             self.stage_sigs[self.cam.trigger_mode] = 3  # 0 - internal, 3 - external enable
 
+            self.stats1.ts.ts_acquire.set(1).wait()
+
             self._mode = SRXMode.fly
         else:
             # Set trigger mode
@@ -334,6 +342,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
     def unstage(self):
         try:
             ret = super().unstage()
+            self.stats1.ts.ts_acquire.set(0).wait()
         finally:
             self._mode = SRXMode.step
         return ret
@@ -345,6 +354,10 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
     def resume(self):
         super().resume()
         self.hdf5.resume()
+
+    def trigger(self):
+        self.stats1.ts.ts_acquire.set(1).wait()
+        return super().trigger()
 
 
 try:
@@ -358,9 +371,12 @@ try:
 
     eiger2.hdf5.compression.set("zlib").wait()  # If 'compression' is None, the plan will not start
 
+    source = "EIG"
+    #source = "ROI1"
+
     # Should be set before warmup
-    eiger2.hdf5.nd_array_port.set("EIG").wait()
-    # eiger2.hdf5.nd_array_port.set("ROI1").wait()
+    eiger2.hdf5.nd_array_port.set(source).wait()
+    eiger2.stats1.nd_array_port.set(source).wait()
 
     eiger2.hdf5.warmup()
 except TimeoutError as ex:

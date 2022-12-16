@@ -12,11 +12,13 @@ import traceback
 from ophyd import Signal
 from ophyd import Component as Cpt
 
+from ophyd.areadetector.base import ADComponent
 from ophyd.areadetector import (AreaDetector, PixiradDetectorCam, ImagePlugin,
                                 TIFFPlugin, StatsPlugin, HDF5Plugin,
                                 ProcessPlugin, ROIPlugin, TransformPlugin,
                                 OverlayPlugin)
-from ophyd.areadetector.plugins import PluginBase, HDF5Plugin_V33
+from ophyd.areadetector.plugins import PluginBase, HDF5Plugin_V33, TimeSeriesPlugin_V33
+
 from ophyd.areadetector.cam import AreaDetectorCam
 from ophyd.device import BlueskyInterface
 from ophyd.utils.epics_pvs import set_and_wait
@@ -226,6 +228,17 @@ class MerlinDetector(AreaDetector):
                                    'acquire_time', 'acquire_period'],
               )
 
+class StatsPluginHXN(StatsPlugin):
+    # ts_read_rate = ADComponent(EpicsSignal, "TS:TSRead.SCAN")
+    ts = ADComponent(TimeSeriesPlugin_V33, "TS:")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.stage_sigs[self.queue_size] = 2000
+        self.stage_sigs[self.ts.queue_size] = 2000
+        self.stage_sigs[self.ts.ts_acquire_mode] = "Fixed length"
+
 
 class SRXMerlin(SingleTriggerV33, MerlinDetector):
     total_points = Cpt(Signal,
@@ -250,11 +263,11 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
                write_path_template = LARGE_FILE_DIRECTORY_PATH,
                root=LARGE_FILE_DIRECTORY_ROOT)
 
-    stats1 = Cpt(StatsPlugin, 'Stats1:')
-    stats2 = Cpt(StatsPlugin, 'Stats2:')
-    stats3 = Cpt(StatsPlugin, 'Stats3:')
-    stats4 = Cpt(StatsPlugin, 'Stats4:')
-    stats5 = Cpt(StatsPlugin, 'Stats5:')
+    stats1 = Cpt(StatsPluginHXN, 'Stats1:')
+    stats2 = Cpt(StatsPluginHXN, 'Stats2:')
+    stats3 = Cpt(StatsPluginHXN, 'Stats3:')
+    stats4 = Cpt(StatsPluginHXN, 'Stats4:')
+    stats5 = Cpt(StatsPluginHXN, 'Stats5:')
     proc1 = Cpt(ProcessPlugin, 'Proc1:')
     transform1 = Cpt(TransformPlugin, 'Trans1:')
 
@@ -330,7 +343,7 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
 
 
 try:
-    raise Exception("Merlin is disabled.")
+    # raise Exception("Merlin is disabled.")
     merlin2 = SRXMerlin('XF:03IDC-ES{Merlin:2}',
                        name='merlin2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
