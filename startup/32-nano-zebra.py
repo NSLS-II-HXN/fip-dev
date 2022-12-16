@@ -237,15 +237,46 @@ class SRXFlyer1Axis(Device):
     def stage(self):
         self._point_counter = 0
         dir = self.fast_axis.get()
+
+        # Disable unnecessary capture, since it slows down acquisition
+        for _ in [
+            self._encoder.pc.data.cap_enc1_bool,
+            self._encoder.pc.data.cap_enc2_bool,
+            self._encoder.pc.data.cap_enc3_bool,
+            self._encoder.pc.data.cap_enc4_bool,
+            self._encoder.pc.data.cap_filt1_bool,
+            self._encoder.pc.data.cap_filt2_bool,
+            self._encoder.pc.data.cap_div1_bool,
+            self._encoder.pc.data.cap_div2_bool,
+            self._encoder.pc.data.cap_div3_bool,
+            self._encoder.pc.data.cap_div4_bool
+        ]:
+            self.stage_sigs[_] = 0
+            self.stage_sigs.move_to_end(_, last=False)
+
+        # self.stage_sigs[self._encoder.pc.data.cap_enc1_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_enc2_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_enc3_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_enc4_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_filt1_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_filt2_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_div1_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_div2_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_div3_bool] = 0
+        # self.stage_sigs[self._encoder.pc.data.cap_div4_bool] = 0
+
         if dir == "NANOHOR":
+            self.stage_sigs[self._encoder.pc.data.cap_enc1_bool] = 1
             self.stage_sigs[self._encoder.pc.enc] = "Enc1"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
             # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
         elif dir == "NANOVER":
+            self.stage_sigs[self._encoder.pc.data.cap_enc2_bool] = 1
             self.stage_sigs[self._encoder.pc.enc] = "Enc2"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
             # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
         elif dir == "NANOZ":
+            self.stage_sigs[self._encoder.pc.data.cap_enc3_bool] = 1
             self.stage_sigs[self._encoder.pc.enc] = "Enc3"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
             # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
@@ -568,12 +599,27 @@ class ExportNanoZebraData:
 
         print(f"Loading from Zebra: time")
         time_d = zebra.pc.data.time.get()
-        print(f"Loading from Zebra: enc1")
-        enc1_d = zebra.pc.data.enc1.get()
-        print(f"Loading from Zebra: enc2")
-        enc2_d = zebra.pc.data.enc2.get()
-        print(f"Loading from Zebra: enc3")
-        enc3_d = zebra.pc.data.enc3.get()
+
+        # Load 'fast' axis data from Zebra and the remaining data generate based on encoder values
+
+        sx = nano_stage.sx.get().user_readback if nano_sx_enabled else 0
+        sy = nano_stage.sy.get().user_readback if nano_sy_enabled else 0
+        sz = nano_stage.sz.get().user_readback if nano_sz_enabled else 0
+
+        if fastaxis == "NANOHOR":
+            enc1_d = zebra.pc.data.enc1.get()
+            enc2_d = [sy] * len(enc1_d)
+            enc3_d = [sz] * len(enc1_d)
+        elif fastaxis == "NANOHOR":
+            enc2_d = zebra.pc.data.enc2.get()
+            enc1_d = [sx] * len(enc2_d)
+            enc3_d = [sz] * len(enc2_d)
+        elif fastaxis == "NANOZ":
+            enc3_d = zebra.pc.data.enc3.get()
+            enc1_d = [sx] * len(enc3_d)
+            enc2_d = [sy] * len(enc3_d)
+        else:
+            raise Exception(f"Unknown value for 'fastaxis': {fastaxis!r}")
 
         # Correction for the encoder values so that they represent the centers of the bins
         if encoder.lower() == "enc1":
@@ -673,9 +719,9 @@ except Exception as ex:
 
 
 # Enable capture for 'enc1', 'enc2' and 'enc3'. At SRX capture is enabled via CSS.
-caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
-caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
-caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
+# caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
+# caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
+# caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
 
 
 

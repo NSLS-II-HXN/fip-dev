@@ -15,6 +15,10 @@ class SRXNanoStage(Device):
 
 nano_stage = SRXNanoStage('XF:03IDC-ES{PT:Smpl-Ax:', name='nano_stage')
 
+# Flags that tell if the PVs are enabled
+nano_sx_enabled, nano_sy_enabled, nano_sz_enabled = True, True, False
+
+
 # # Lakeshore temperature monitors
 # class SRXNanoTemp(Device):
 #     temp_nanoKB_horz = Cpt(EpicsSignalRO, '2}T:C-I')
