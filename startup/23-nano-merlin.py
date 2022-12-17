@@ -343,7 +343,7 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
 
 
 try:
-    # raise Exception("Merlin is disabled.")
+    raise Exception("'merlin2' is disabled.")
     merlin2 = SRXMerlin('XF:03IDC-ES{Merlin:2}',
                        name='merlin2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
@@ -367,4 +367,3 @@ except Exception:
           end='\n\n')
     traceback.print_exc()
     print()
-

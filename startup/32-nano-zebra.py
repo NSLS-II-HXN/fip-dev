@@ -234,12 +234,17 @@ class SRXFlyer1Axis(Device):
 
         self._data_exporter = ExportNanoZebraData()
 
-    def stage(self):
-        self._point_counter = 0
+    def _select_captured_data(self):
+        """
+        Select the data to be captured by Zebra. Capturing unnecessary data slows down
+        the scans, so only necessary sources should be selected. Setting the respective
+        PVs can not be done in a fast sequence (technically setting PV is fast, but Zebra
+        parameters remain unchanged unless there is a pause after writing to each PV),
+        so the configuration can not be performed using 'stage_sigs'.
+        """
         dir = self.fast_axis.get()
 
-        # Disable unnecessary capture, since it slows down acquisition
-        for _ in [
+        sigs = {_: 0 for _ in [
             self._encoder.pc.data.cap_enc1_bool,
             self._encoder.pc.data.cap_enc2_bool,
             self._encoder.pc.data.cap_enc3_bool,
@@ -250,33 +255,39 @@ class SRXFlyer1Axis(Device):
             self._encoder.pc.data.cap_div2_bool,
             self._encoder.pc.data.cap_div3_bool,
             self._encoder.pc.data.cap_div4_bool
-        ]:
-            self.stage_sigs[_] = 0
-            self.stage_sigs.move_to_end(_, last=False)
-
-        # self.stage_sigs[self._encoder.pc.data.cap_enc1_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_enc2_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_enc3_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_enc4_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_filt1_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_filt2_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_div1_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_div2_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_div3_bool] = 0
-        # self.stage_sigs[self._encoder.pc.data.cap_div4_bool] = 0
+        ]}
 
         if dir == "NANOHOR":
-            self.stage_sigs[self._encoder.pc.data.cap_enc1_bool] = 1
+            sigs[self._encoder.pc.data.cap_enc1_bool] = 1
+        elif dir == "NANOVER":
+            sigs[self._encoder.pc.data.cap_enc2_bool] = 1
+        elif dir == "NANOZ":
+            sigs[self._encoder.pc.data.cap_enc3_bool] = 1
+        else:
+            raise ValueError(f"Unknown value: dir={dir!r}")
+
+        # Change the PV values only if the new values is different from the current values.
+        for sig, value in sigs.items():
+            current_value = sig.get()
+            if current_value != value:
+                sig.set(value).wait()
+                ttime.sleep(0.2)  # Determined experimentally
+
+    def stage(self):
+        self._point_counter = 0
+        dir = self.fast_axis.get()
+
+        self._select_captured_data()
+
+        if dir == "NANOHOR":
             self.stage_sigs[self._encoder.pc.enc] = "Enc1"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
             # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
         elif dir == "NANOVER":
-            self.stage_sigs[self._encoder.pc.data.cap_enc2_bool] = 1
             self.stage_sigs[self._encoder.pc.enc] = "Enc2"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
             # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
         elif dir == "NANOZ":
-            self.stage_sigs[self._encoder.pc.data.cap_enc3_bool] = 1
             self.stage_sigs[self._encoder.pc.enc] = "Enc3"
             # self.stage_sigs[self._encoder.pc.dir] = "Positive"
             # self.stage_sigs[self._encoder.pc.enc_res2] = 9.5368e-05
@@ -322,12 +333,20 @@ class SRXFlyer1Axis(Device):
 
         self._data_exporter.open(self.__write_filepath)
 
+        print(f"Before staging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+        print(f"Before staging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
         super().stage()
+        print(f"After staging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+        print(f"After staging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
     def unstage(self):
         self._point_counter = None
         self._data_exporter.close()
+        print(f"Before unstaging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+        print(f"Before unstaging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
         super().unstage()
+        print(f"After unstaging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+        print(f"After unstaging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
     def describe_collect(self):
 
@@ -360,6 +379,8 @@ class SRXFlyer1Axis(Device):
 
     def kickoff(self, *, xstart, xstop, xnum, dwell):
         print(f"Kickoff: xstart={xstart} xtop={xstop} dwell={dwell}")
+
+        self._data_exporter.set_fixed_positions()
 
         dets_by_name = {d.name: d for d in self.detectors}
 
@@ -560,6 +581,10 @@ class ExportNanoZebraData:
         self._fp = None
         self._filepath = None
 
+        self._sx_fixed = 0
+        self._sy_fixed = 0
+        self._sz_fixed = 0
+
     def open(self, filepath):
         self.close()
         self._filepath = filepath
@@ -583,6 +608,22 @@ class ExportNanoZebraData:
     def __del__(self):
         self.close()
 
+    def set_fixed_positions(self):
+        """
+        Read and save the positions from motor controller. It is assumed that only the fast
+        axis is read from Zebra. Positions for the other axes are generated based on fixed
+        positions loadeded by calling this function.
+        """
+        def get_position(obj):
+            if not getattr(obj, "is_disabled", False):
+                return obj.get().user_readback
+            else:
+                return 0
+
+        self._sx_fixed = get_position(nano_stage.sx)
+        self._sy_fixed = get_position(nano_stage.sy)
+        self._sz_fixed = get_position(nano_stage.sz)
+
     def export(self, zebra, fastaxis):
         j = 0
         while zebra.pc.data_in_progress.get() == 1:
@@ -600,24 +641,18 @@ class ExportNanoZebraData:
         print(f"Loading from Zebra: time")
         time_d = zebra.pc.data.time.get()
 
-        # Load 'fast' axis data from Zebra and the remaining data generate based on encoder values
-
-        sx = nano_stage.sx.get().user_readback if nano_sx_enabled else 0
-        sy = nano_stage.sy.get().user_readback if nano_sy_enabled else 0
-        sz = nano_stage.sz.get().user_readback if nano_sz_enabled else 0
-
         if fastaxis == "NANOHOR":
             enc1_d = zebra.pc.data.enc1.get()
-            enc2_d = [sy] * len(enc1_d)
-            enc3_d = [sz] * len(enc1_d)
-        elif fastaxis == "NANOHOR":
+            enc2_d = [self._sy_fixed] * len(enc1_d)
+            enc3_d = [self._sz_fixed] * len(enc1_d)
+        elif fastaxis == "NANOVER":
             enc2_d = zebra.pc.data.enc2.get()
-            enc1_d = [sx] * len(enc2_d)
-            enc3_d = [sz] * len(enc2_d)
+            enc1_d = [self._sx_fixed] * len(enc2_d)
+            enc3_d = [self._sz_fixed] * len(enc2_d)
         elif fastaxis == "NANOZ":
             enc3_d = zebra.pc.data.enc3.get()
-            enc1_d = [sx] * len(enc3_d)
-            enc2_d = [sy] * len(enc3_d)
+            enc1_d = [self._sx_fixed] * len(enc3_d)
+            enc2_d = [self._sy_fixed] * len(enc3_d)
         else:
             raise Exception(f"Unknown value for 'fastaxis': {fastaxis!r}")
 
@@ -722,7 +757,3 @@ except Exception as ex:
 # caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B0", 1)
 # caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B1", 1)
 # caput("XF:03IDC-ES{Zeb:3}:PC_BIT_CAP:B2", 1)
-
-
-
-

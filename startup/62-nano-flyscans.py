@@ -464,6 +464,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         print("Starting the plan")
         print(f"flying_zebra.detectors={flying_zebra.detectors}")
 
+        print(f"Plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+        print(f"Plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
+
         # TODO move this to stage sigs
         for d in flying_zebra.detectors:
             if d.name != "merlin2":
@@ -519,6 +522,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # yield from check_shutters(shutter, 'Open')  ## Uncomment this
     if verbose:
         toc(t_open, str='Open shutter')
+
+    print(f"Before plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+    print(f"Before plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
     # Run the scan
     uid = yield from final_plan

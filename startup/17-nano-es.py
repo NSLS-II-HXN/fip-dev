@@ -15,19 +15,10 @@ class SRXNanoStage(Device):
 
 nano_stage = SRXNanoStage('XF:03IDC-ES{PT:Smpl-Ax:', name='nano_stage')
 
-# Flags that tell if the PVs are enabled
-nano_sx_enabled, nano_sy_enabled, nano_sz_enabled = True, True, False
-
-
-# # Lakeshore temperature monitors
-# class SRXNanoTemp(Device):
-#     temp_nanoKB_horz = Cpt(EpicsSignalRO, '2}T:C-I')
-#     temp_nanoKB_vert = Cpt(EpicsSignalRO, '1}T:C-I')
-#     temp_nanoKB_base = Cpt(EpicsSignalRO, '4}T:C-I')
-#     temp_microKB_base = Cpt(EpicsSignalRO, '3}T:C-I')
-
-
-# temp_nanoKB = SRXNanoTemp('XF:05IDD-ES{LS:1-Chan:', name='temp_nanoKB')
+# Temporary disable a motor (e.g. if the motor is not functioning and PVs are not accessible)
+setattr(nano_stage.sx, "is_disabled", False)
+setattr(nano_stage.sy, "is_disabled", False)
+setattr(nano_stage.sz, "is_disabled", True)
 
 
 # # Interferometers
@@ -40,20 +31,19 @@ nano_sx_enabled, nano_sy_enabled, nano_sz_enabled = True, True, False
 # nanoKB_interferometer = SRXNanoInterferometer('XF:05IDD-ES:1{PICOSCALE:1}', name='nanoKB_interferometer')
 
 
-# stages_to_move = [nano_stage.sx, nano_stage.sy, nano_stage.sz]
-stages_to_move = [nano_stage.sx, nano_stage.sy]
+stages_to_move = [nano_stage.sx, nano_stage.sy, nano_stage.sz]
 velocity_slow = 30
 velocity_fast = 300
 
 def set_scanner_velocity(velocity=velocity_slow):
     for d in stages_to_move:
-        yield from bps.mv(d.velocity, velocity)
-        # d.velocity.set(velocity).wait()
+        if not getattr(d, "is_disabled", False):
+            yield from bps.mv(d.velocity, velocity)
 
 def reset_scanner_velocity():
     for d in stages_to_move:
-        yield from bps.mv(d.velocity, velocity_fast)
-        # d.velocity.set(velocity_fast).wait()
+        if not getattr(d, "is_disabled", False):
+            yield from bps.mv(d.velocity, velocity_fast)
 
 
 from datetime import datetime
