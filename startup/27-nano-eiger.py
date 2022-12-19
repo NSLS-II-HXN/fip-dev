@@ -361,7 +361,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
 
 
 try:
-    raise Exception("'eiger2' is disabled ...")
+    # raise Exception("'eiger2' is disabled ...")
     eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])

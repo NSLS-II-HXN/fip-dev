@@ -228,9 +228,13 @@ class MerlinDetector(AreaDetector):
                                    'acquire_time', 'acquire_period'],
               )
 
+class TimeSeriesPluginHXN(TimeSeriesPlugin_V33):
+    ts_read_scan = ADComponent(EpicsSignal, "TSRead.SCAN")
+    ts_read_proc = ADComponent(EpicsSignal, "TSRead.PROC")
+
+
 class StatsPluginHXN(StatsPlugin):
-    # ts_read_rate = ADComponent(EpicsSignal, "TS:TSRead.SCAN")
-    ts = ADComponent(TimeSeriesPlugin_V33, "TS:")
+    ts = ADComponent(TimeSeriesPluginHXN, "TS:")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -303,6 +307,8 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
             self.stage_sigs[self.cam.image_mode] = 1  # 0 -single, 1 - multiple
             self.stage_sigs[self.cam.trigger_mode] = 2  # 0 - internal, 2 - start rising
 
+            self.stats1.ts.ts_acquire.set(1).wait()
+
             self._mode = SRXMode.fly
         else:
             # Set trigger mode
@@ -328,6 +334,7 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
     def unstage(self):
         try:
             ret = super().unstage()
+            self.stats1.ts.ts_acquire.set(0).wait()
         finally:
             self._mode = SRXMode.step
         return ret
@@ -340,10 +347,13 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
         super().resume()
         self.hdf5.resume()
 
+    def trigger(self):
+        self.stats1.ts.ts_acquire.set(1).wait()
+        return super().trigger()
 
 
 try:
-    raise Exception("'merlin2' is disabled.")
+    # raise Exception("'merlin2' is disabled.")
     merlin2 = SRXMerlin('XF:03IDC-ES{Merlin:2}',
                        name='merlin2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])

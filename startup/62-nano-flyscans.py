@@ -195,10 +195,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     md['scan']['shape'] = (xnum, ynum)
 
     # Synchronize encoders
-    flying_zebra._encoder.pc.enc_pos1_sync.put(1)  # Scanner X
-    flying_zebra._encoder.pc.enc_pos2_sync.put(1)  # Scanner Y
-    flying_zebra._encoder.pc.enc_pos3_sync.put(1)  # Scanner Z
-    yield from bps.sleep(1)
+    # flying_zebra._encoder.pc.enc_pos1_sync.put(1)
+    # flying_zebra._encoder.pc.enc_pos2_sync.put(1)
+    # flying_zebra._encoder.pc.enc_pos3_sync.put(1)
+    yield from bps.mv(flying_zebra._encoder.pc.enc_pos1_sync, 1)
+    yield from bps.mv(flying_zebra._encoder.pc.enc_pos2_sync, 1)
+    yield from bps.mv(flying_zebra._encoder.pc.enc_pos3_sync, 1)
+    # yield from bps.sleep(1)
 
     yield from reset_scanner_velocity()
 
@@ -243,7 +246,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             print('done')
 
         if verbose:
-            toc(t_mvstartfly, str='Move to start fly each')
+            toc(t_mvstartfly, str='Total time: Move to start fly each')
 
         # Set the scan speed
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
@@ -343,6 +346,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         # yield from bps.sleep(0.5)
 
+        if verbose:
+            toc(t_mvstartfly, str='Total time: Start scan')
+
         # start the 'fly'
         def print_watch(*args, **kwargs):
             with open('~/bluesky_output.txt', 'a') as f:
@@ -377,7 +383,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # yield from bps.sleep(1)
 
         if verbose:
-            toc(t_datacollect, str='Total time')
+            toc(t_mvstartfly, str='Total time: Start finished')
+        if verbose:
+            toc(t_datacollect, str='Total collection time')
 
         # we still know about ion from above
         if ion:
@@ -408,6 +416,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             toc(t_zebcollect, str='Zebra collect')
         print(f"'zebra_collect' finished")
 
+        if verbose:
+            toc(t_mvstartfly, str='Total time: Step completed')
+
         print(f"Step is completed")
 
     def at_scan(name, doc):
@@ -432,30 +443,52 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     # yield from mv(xs.erase, 0)  ## Uncomment this
 
+    # Select PV for monitoring
+    d_names = [_.name for _ in detectors_stage_once]
+    ts_monitor_dec = ts_monitor_during_decorator
+    if "merlin2" in d_names:
+        roi_pv = merlin2.stats1.ts_total
+        roi_pv_force_update = merlin2.stats1.ts.ts_read_proc        
+    elif "eiger2" in d_names:
+        roi_pv = eiger2.stats1.ts_total
+        roi_pv_force_update = eiger2.stats1.ts.ts_read_proc        
+    else:
+        roi_pv = None
+        roi_pv_force_update = None        
+        ts_monitor_dec = ts_monitor_during_decorator_disabled
+
     # Setup LivePlot
     if plot:
         if (ynum == 1):
-            livepopup = [SRX1DFlyerPlot(xs.channel1.rois.roi01.value.name,
-                                        xstart=xstart,
-                                        xstep=(xstop-xstart)/(xnum-1),
-                                        xlabel=xmotor.name)]
+            livepopup = [
+                SRX1DTSFlyerPlot(
+                    roi_pv.name,
+                    xstart=xstart,
+                    xstep=(xstop-xstart)/(xnum-1),
+                    xlabel=xmotor.name
+                )
+            ]
         else:
-            livepopup = [LiveGrid((ynum, xnum+1),
-                                  xs.channel1.rois.roi01.value.name,
-                                  extent=(xstart, xstop, ystart, ystop),
-                                  x_positive='right', y_positive='down')]
+            livepopup = [
+                TSLiveGrid(
+                    (ynum, xnum),
+                    roi_pv.name,
+                    extent=(xstart, xstop, ystart, ystop),
+                    x_positive='right',
+                    y_positive='down'
+                )
+            ]
     else:
         livepopup = []
-
 
     for d in detectors_stage_once:
         if d:
             yield from bps.mov(d.fly_next, True)
 
-
     @subs_decorator(livepopup)
     @subs_decorator({'start': at_scan})
     @subs_decorator({'stop': finalize_scan})
+    @ts_monitor_dec([roi_pv])
     # @monitor_during_decorator([xs.channel1.rois.roi01.value])  ## Uncomment this
     # @monitor_during_decorator([xs.channel1.rois.roi01.value, xs.array_counter])
     @stage_decorator([flying_zebra] + detectors_stage_once)  # Below, 'scan' stage ymotor.
@@ -504,15 +537,23 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 print(f'Direction = {direction}')
                 print(f'Start = {start}')
                 print(f'Stop  = {stop}')
-            flying_zebra._encoder.pc.dir.set(direction)
+            
+            yield from bps.mv(flying_zebra._encoder.pc.dir, direction)
+            # flying_zebra._encoder.pc.dir.set(direction).wait()
             yield from fly_each_step(ymotor, step, start, stop)
+
+            # Force update of the respective PV so that all collected monitoring data for the row 
+            #   is loaded before the plugin is reset. Otherwise data in monitoring stream will not
+            #   contain last points of rows.
+            if roi_pv_force_update:
+                yield from bps.mv(roi_pv_force_update, 1)
+
             # print('return from step\t',time.time())
             ystep = ystep + 1
 
     # Setup the final scan plan
     if shutter:
-        final_plan = finalize_wrapper(plan(),
-                                      check_shutters(shutter, 'Close'))
+        final_plan = finalize_wrapper(plan(), check_shutters(shutter, 'Close'))
     else:
         final_plan = plan()
 
