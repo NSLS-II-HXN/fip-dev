@@ -357,6 +357,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 f.write(json.dumps(kwargs))
                 f.write('\n')
         st = yield from abs_set(xmotor, row_stop, group=row_scan)
+        # st = yield from abs_set(xmotor, row_stop)
         # st.watch(print_watch)
 
         if verbose:
@@ -374,16 +375,20 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 ttime.sleep(0.001)
             toc(t_datacollect, str='  sclr1 done')
 
+        # print("Waiting for motor to stop")
+        # st.wait()
+        # if verbose:
+        #     toc(t_mvstartfly, str='Total time: Motor stopped')
+
         # wait for the motor and detectors to all agree they are done
         print("Waiting for the row scan to complete ...")
         yield from bps.wait(group=row_scan)
         print("Row scan is completed")
-        # st.wait()
 
         # yield from bps.sleep(1)
 
         if verbose:
-            toc(t_mvstartfly, str='Total time: Start finished')
+            toc(t_mvstartfly, str='Total time: Scan finished')
         if verbose:
             toc(t_datacollect, str='Total collection time')
 

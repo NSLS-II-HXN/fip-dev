@@ -333,20 +333,12 @@ class SRXFlyer1Axis(Device):
 
         self._data_exporter.open(self.__write_filepath)
 
-        print(f"Before staging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
-        print(f"Before staging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
         super().stage()
-        print(f"After staging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
-        print(f"After staging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
     def unstage(self):
         self._point_counter = None
         self._data_exporter.close()
-        print(f"Before unstaging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
-        print(f"Before unstaging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
         super().unstage()
-        print(f"After unstaging (enc1): {nano_flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
-        print(f"After unstaging (enc2): {nano_flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
     def describe_collect(self):
 
