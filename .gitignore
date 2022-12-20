@@ -51,6 +51,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+*.swp
+
 # Translations
 *.mo
 *.pot
@@ -79,7 +81,7 @@ target/
 
 # IPython
 profile_default/
-ipython_config.py
+# ipython_config.py
 
 # pyenv
 .python-version
@@ -142,4 +144,3 @@ security
 #history*.sqlite*
 *.sqlite*
 profile_default
-

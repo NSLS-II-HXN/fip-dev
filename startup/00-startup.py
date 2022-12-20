@@ -385,6 +385,9 @@ configure_base(
 )
 # configure_olog(get_ipython().user_ns)
 
+# bec.disable_table()
+# bec.disable_plots()
+
 from bluesky.callbacks.best_effort import BestEffortCallback
 
 bec = BestEffortCallback()
