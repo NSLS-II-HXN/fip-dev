@@ -140,6 +140,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             else:
                 raise ValueError(f"Unsupported detector: {det_name!r}")
 
+            if det_name == "eiger2":
+                # Acquire one frame with the computed acquire time to avoid 'Invalid frame' 
+                #   errors in HDF5 plugin. This may be needed because Eiger is using
+                #  'autosummation' for longer exposure times, which may result in different
+                #  data representation for short and long exposures (just an assumption).
+                dpc.hdf5.warmup(acquire_time=acquire_time)
+
             dpc.cam.stage_sigs['acquire_time'] = acquire_time
             dpc.cam.stage_sigs['acquire_period'] = acquire_period
             dpc.cam.stage_sigs['num_images'] = 1

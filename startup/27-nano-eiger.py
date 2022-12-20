@@ -182,12 +182,17 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
 
         return desc
 
-    def warmup(self):
+    def warmup(self, acquire_time=1):
         """
         A convenience method for 'priming' the plugin.
 
         The plugin has to 'see' one acquisition before it is ready to capture.
         This sets the array size, etc.
+
+        Parameters
+        ----------
+        acquire_time: float
+            Exposure time for warmup, s
         """
         self.enable.set(1).wait()
         sigs = OrderedDict(
@@ -198,10 +203,9 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
                 (self.parent.cam.image_mode, "Single"),
                 (self.parent.cam.trigger_mode, "Internal Series"),
                 (self.parent.cam.manual_trigger, "Disable"),
-                # just in case tha acquisition time is set very long...
                 (self.parent.cam.num_triggers, 1),
-                (self.parent.cam.acquire_time, 1),
-                (self.parent.cam.acquire_period, 1),
+                (self.parent.cam.acquire_period, acquire_time),  # Adjusted once acquire_time is set
+                (self.parent.cam.acquire_time, acquire_time),
                 (self.parent.cam.acquire, 1),
             ]
         )
@@ -212,7 +216,7 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
             ttime.sleep(0.1)  # abundance of caution
             sig.set(val).wait()
 
-        ttime.sleep(2)  # wait for acquisition
+        ttime.sleep(acquire_time + 1)  # wait for acquisition
 
         for sig, val in reversed(list(original_vals.items())):
             ttime.sleep(0.1)
