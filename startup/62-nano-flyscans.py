@@ -135,7 +135,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 if acquire_time <= 0:
                     raise ValueError("Acquistion period is too small. Increase dwell time")
             elif det_name == "eiger2":
-                acquire_time = 0.5 * dwell
+                acquire_time = 0.9 * dwell
                 acquire_period = acquire_time
             else:
                 raise ValueError(f"Unsupported detector: {det_name!r}")
@@ -157,20 +157,23 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     # If delta is None, set delta based on time for acceleration
     if delta is None:
-        MIN_DELTA = 0.5  # old default value
-        v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
-        t_acc = xmotor.acceleration.get()  # acceleration time
-        delta = 0.5 * t_acc * v  # distance the stage will travel in t_acc
-        delta = np.amax((delta, MIN_DELTA))
-        # delta = 0.500 #was 2.5 when npoint scanner drifted
+        # MIN_DELTA = 0.5  # old default value
+        # v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
+        # t_acc = xmotor.acceleration.get()  # acceleration time
+        # delta = 0.5 * t_acc * v  # distance the stage will travel in t_acc
+        # delta = np.amax((delta, MIN_DELTA))
+        delta = 0.500
+
 
     # Move to start scanning location
     # Calculate move to scan start
     pxsize = (xstop - xstart) / (xnum - 1)
     # row_start = xstart - delta - (pxsize / 2)
     # row_stop = xstop + delta + (pxsize / 2)
-    row_start = xstart - delta - max(pxsize, 1)
-    row_stop = xstop + delta + max(pxsize, 1)
+    # row_start = xstart - delta - max(pxsize, 1)
+    #row_stop = xstop + delta + max(pxsize, 1)
+    row_start = xstart - delta - pxsize
+    row_stop = xstop + delta + pxsize
 
     # row_start, row_stop = xstart - 0.3, xstop + 0.3
 
@@ -212,6 +215,20 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     yield from reset_scanner_velocity()
 
+    # Select PV for monitoring
+    d_names = [_.name for _ in detectors_stage_once]
+    ts_monitor_dec = ts_monitor_during_decorator
+    if "merlin2" in d_names:
+        roi_pv = merlin2.stats1.ts_total
+        roi_pv_force_update = merlin2.stats1.ts.ts_read_proc        
+    elif "eiger2" in d_names:
+        roi_pv = eiger2.stats1.ts_total
+        roi_pv_force_update = eiger2.stats1.ts.ts_read_proc        
+    else:
+        roi_pv = None
+        roi_pv_force_update = None        
+        ts_monitor_dec = ts_monitor_during_decorator_disabled
+
     print(f"Ready to start the scan !!!")  ##
 
     # @stage_decorator(flying_zebra.detectors)
@@ -232,7 +249,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             print(f"Fast axis: {xmotor.read()} Slow axis: {motor.read()}")
 
         if verbose:
-            t_mvstartfly = tic()
+            t_startfly = tic()
+            
         yield from move_to_start_fly()
 
         x_set = row_start
@@ -253,7 +271,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             print('done')
 
         if verbose:
-            toc(t_mvstartfly, str='Total time: Move to start fly each')
+            toc(t_startfly, str='Total time: Move to start fly each')
 
         # Set the scan speed
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
@@ -341,8 +359,11 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 # while not d.cam.acquire.get():
                     # print("Waiting for detector state")
                     # yield from bps.sleep(0.001)
-                yield from bps.sleep(0.3)
+                yield from bps.sleep(0.2)
                 toc(t_wait_detector, str=f'  waiting for detector {d.name!r}')
+
+        if roi_pv_force_update:
+            yield from bps.mv(roi_pv_force_update, 1)
 
         if verbose:
             toc(t_datacollect, str='  trigger detectors')
@@ -354,7 +375,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # yield from bps.sleep(0.5)
 
         if verbose:
-            toc(t_mvstartfly, str='Total time: Start scan')
+            toc(t_startfly, str='Total time: Start scan')
 
         # start the 'fly'
         def print_watch(*args, **kwargs):
@@ -385,7 +406,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # print("Waiting for motor to stop")
         # st.wait()
         # if verbose:
-        #     toc(t_mvstartfly, str='Total time: Motor stopped')
+        #     toc(t_startfly, str='Total time: Motor stopped')
 
         # wait for the motor and detectors to all agree they are done
         print("Waiting for the row scan to complete ...")
@@ -395,7 +416,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # yield from bps.sleep(1)
 
         if verbose:
-            toc(t_mvstartfly, str='Total time: Scan finished')
+            toc(t_startfly, str='Total time: Motor stopped. Acquisition completed.')
         if verbose:
             toc(t_datacollect, str='Total collection time')
 
@@ -428,8 +449,14 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             toc(t_zebcollect, str='Zebra collect')
         print(f"'zebra_collect' finished")
 
+        # Force update of the respective PV so that all collected monitoring data for the row 
+        #   is loaded before the plugin is reset. Otherwise data in monitoring stream will not
+        #   contain last points of rows.
+        if roi_pv_force_update:
+            yield from bps.mv(roi_pv_force_update, 1)
+
         if verbose:
-            toc(t_mvstartfly, str='Total time: Step completed')
+            toc(t_startfly, str='Total time: Step completed')
 
         print(f"Step is completed")
 
@@ -454,20 +481,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # xs = dets_by_name[flying_zebra.detectors[0].name]  ## Uncomment this
 
     # yield from mv(xs.erase, 0)  ## Uncomment this
-
-    # Select PV for monitoring
-    d_names = [_.name for _ in detectors_stage_once]
-    ts_monitor_dec = ts_monitor_during_decorator
-    if "merlin2" in d_names:
-        roi_pv = merlin2.stats1.ts_total
-        roi_pv_force_update = merlin2.stats1.ts.ts_read_proc        
-    elif "eiger2" in d_names:
-        roi_pv = eiger2.stats1.ts_total
-        roi_pv_force_update = eiger2.stats1.ts.ts_read_proc        
-    else:
-        roi_pv = None
-        roi_pv_force_update = None        
-        ts_monitor_dec = ts_monitor_during_decorator_disabled
 
     # Setup LivePlot
     if plot:
@@ -525,6 +538,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             # yield from abs_set(scanrecord.time_remaining,  ## Uncomment this
             #                    (ynum - ystep) * ( dwell * xnum + 3.8 ) / 3600.)  ## Uncomment this
             # 'arm' the all of the detectors for outputting fly data
+
             print(f"Starting the next row")
             for d in detectors_stage_every_row:
                 # if d and (d.name != "merlin2"):
@@ -553,12 +567,6 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             yield from bps.mv(flying_zebra._encoder.pc.dir, direction)
             # flying_zebra._encoder.pc.dir.set(direction).wait()
             yield from fly_each_step(ymotor, step, start, stop)
-
-            # Force update of the respective PV so that all collected monitoring data for the row 
-            #   is loaded before the plugin is reset. Otherwise data in monitoring stream will not
-            #   contain last points of rows.
-            if roi_pv_force_update:
-                yield from bps.mv(roi_pv_force_update, 1)
 
             # print('return from step\t',time.time())
             ystep = ystep + 1

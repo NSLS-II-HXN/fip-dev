@@ -199,6 +199,7 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
             [
                 # (self.file_write_mode, "Capture"),
                 # (self.file_write_mode, "Single"),
+                (self.parent.roi1.enable, 1),
                 (self.parent.cam.array_callbacks, 1),
                 (self.parent.cam.image_mode, "Single"),
                 (self.parent.cam.trigger_mode, "Internal Series"),
