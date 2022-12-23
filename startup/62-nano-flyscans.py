@@ -250,8 +250,12 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         if verbose:
             t_startfly = tic()
-            
+            toc(t_startfly, "TIMER (STEP) - STARTING TIMER")            
+        
         yield from move_to_start_fly()
+
+        if verbose:
+            toc(t_startfly, "TIMER (STEP) - MOTOR IS MOVED TO STARTING POINT")            
 
         x_set = row_start
         x_dial = xmotor.user_readback.get()
@@ -271,12 +275,15 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             print('done')
 
         if verbose:
-            toc(t_startfly, str='Total time: Move to start fly each')
+            toc(t_startfly, str='TIMER (STEP) - MOTOR POSITION IS CHECKED')
 
         # Set the scan speed
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
         print(f"Forward speed for the fast axis: {v} (xnum={xnum} dwell={dwell})")
         yield from mv(xmotor.velocity, v)
+
+        if verbose:
+            toc(t_startfly, str='TIMER (STEP) - FORWARD VELOCITY IS SET')
 
         # set up all of the detectors
         # TODO we should be able to move this out of the per-line call?!
@@ -312,6 +319,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if ion:
             yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
+        if verbose:
+            toc(t_startfly, str='TIMER (STEP) - DETECTORS ARE CONFIGURED')
+
         def zebra_kickoff():
             # start_zebra, stop_zebra = xstart * 1000000, xstop * 1000000
             start_zebra, stop_zebra = xstart, xstop
@@ -324,22 +334,19 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                                    xstart=stop_zebra, xstop=start_zebra, xnum=xnum, dwell=dwell,
                                    wait=True)
 
-        if verbose:
-            t_zebkickoff = tic()
         yield from zebra_kickoff()
-        if verbose:
-            toc(t_zebkickoff, str='Zebra kickoff')
 
         if verbose:
-            t_datacollect = tic()
+            toc(t_startfly, str='TIMER (STEP) - ZEBRA STARTED')
 
         # arm SIS3820, note that there is a 1 sec delay in setting X
         # into motion so the first point *in each row* won't
         # normalize...
         if ion:
             yield from abs_set(ion.erase_start, 1)
-        if verbose:
-            toc(t_datacollect, str='  reset scaler')
+            if verbose:
+                toc(t_startfly, str='TIMER (STEP) - SCALAR STARTED')
+
 
         # trigger all of the detectors
         row_scan = short_uid('row')
@@ -349,7 +356,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             if verbose:
                 print(f'  triggering {d.name}')
             st = yield from bps.trigger(d, group=row_scan)
-            st.add_callback(lambda x: toc(t_datacollect, str=f"  status object  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
+            st.add_callback(lambda x: toc(t_startfly, str=f"  DETECTOR  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
 
             # if (d.name == 'merlin2'):
             if (d.name == 'eiger2'):
@@ -366,16 +373,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             yield from bps.mv(roi_pv_force_update, 1)
 
         if verbose:
-            toc(t_datacollect, str='  trigger detectors')
-
-        # yield from bps.sleep(1.5)
-        if verbose:
-            toc(t_datacollect, str='  sleep')
-
-        # yield from bps.sleep(0.5)
-
-        if verbose:
-            toc(t_startfly, str='Total time: Start scan')
+            toc(t_startfly, str='TIMER (STEP) - DETECTORS TRIGGERED')
 
         # start the 'fly'
         def print_watch(*args, **kwargs):
@@ -385,11 +383,14 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 f.write(json.dumps(kwargs))
                 f.write('\n')
         st = yield from abs_set(xmotor, row_stop, group=row_scan)
+        if verbose:
+            st.add_callback(lambda x: toc(t_startfly, str=f"  MOTOR  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
+
         # st = yield from abs_set(xmotor, row_stop)
         # st.watch(print_watch)
 
         if verbose:
-            toc(t_datacollect, str='  move start')
+            toc(t_startfly, str='TIMER (STEP) - MOTOR STARTED')
 
         if verbose and False:
             ttime.sleep(1)
@@ -416,9 +417,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         # yield from bps.sleep(1)
 
         if verbose:
-            toc(t_startfly, str='Total time: Motor stopped. Acquisition completed.')
-        if verbose:
-            toc(t_datacollect, str='Total collection time')
+            toc(t_startfly, str='TIMER (STEP) - MOTOR STOPPED. ACQUISITION_COMPLETED.')
 
         # we still know about ion from above
         if ion:
@@ -437,7 +436,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         yield from zebra_complete()
         if verbose:
             toc(t_zebcomplete, str='Zebra complete')
-        print(f"'zebra_complete' finished")
+
+        if verbose:
+            toc(t_startfly, str='TIMER (STEP) - ZEBRA ACQUISITION COMPLETED.')
 
         # @timer_wrapper
         def zebra_collect():
@@ -447,7 +448,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         yield from zebra_collect()
         if verbose:
             toc(t_zebcollect, str='Zebra collect')
-        print(f"'zebra_collect' finished")
+
+        if verbose:
+            toc(t_startfly, str='TIMER (STEP) - ZEBRA COLLECTION COMPLETED.')
 
         # Force update of the respective PV so that all collected monitoring data for the row 
         #   is loaded before the plugin is reset. Otherwise data in monitoring stream will not
@@ -456,7 +459,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             yield from bps.mv(roi_pv_force_update, 1)
 
         if verbose:
-            toc(t_startfly, str='Total time: Step completed')
+            toc(t_startfly, str='TIMER (STEP) - STEP COMPLETED.')
 
         print(f"Step is completed")
 
@@ -519,32 +522,26 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     @stage_decorator([flying_zebra] + detectors_stage_once)  # Below, 'scan' stage ymotor.
     @run_decorator(md=md)
     def plan():
-        print("Starting the plan")
+        print("Starting the plan ...")
         print(f"flying_zebra.detectors={flying_zebra.detectors}")
 
-        print(f"Plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
-        print(f"Plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
+        # print(f"Plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+        # print(f"Plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
         # TODO move this to stage sigs
         for d in flying_zebra.detectors:
             if d.name != "merlin2":
                 yield from bps.mov(d.total_points, xnum)
 
-        # TODO move this to stage sigs
-        # yield from bps.mov(xs.external_trig, True)  ## Uncomment this
-
         ystep = 0
         for step in np.linspace(ystart, ystop, ynum):
-            # yield from abs_set(scanrecord.time_remaining,  ## Uncomment this
-            #                    (ynum - ystep) * ( dwell * xnum + 3.8 ) / 3600.)  ## Uncomment this
-            # 'arm' the all of the detectors for outputting fly data
 
             print(f"Starting the next row")
             for d in detectors_stage_every_row:
                 # if d and (d.name != "merlin2"):
                 if d:
                     yield from bps.mov(d.fly_next, True)
-            # print('h5 armed\t',time.time())
+
             if (snake is False):
                 direction = 0
                 start = row_start
@@ -558,17 +555,15 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                     direction = 1
                     start = row_stop
                     stop = row_start
-            # Do work
+
             if verbose:
                 print(f'Direction = {direction}')
                 print(f'Start = {start}')
                 print(f'Stop  = {stop}')
             
             yield from bps.mv(flying_zebra._encoder.pc.dir, direction)
-            # flying_zebra._encoder.pc.dir.set(direction).wait()
             yield from fly_each_step(ymotor, step, start, stop)
 
-            # print('return from step\t',time.time())
             ystep = ystep + 1
 
     # Setup the final scan plan
@@ -582,10 +577,10 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         t_open = tic()
     # yield from check_shutters(shutter, 'Open')  ## Uncomment this
     if verbose:
-        toc(t_open, str='Open shutter')
+        toc(t_open, str='Open shutter (dt)')
 
-    print(f"Before plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
-    print(f"Before plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
+    # print(f"Before plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
+    # print(f"Before plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
 
     # Run the scan
     uid = yield from final_plan

@@ -258,7 +258,7 @@ class SRXFlyer1Axis(Device):
         ]}
 
         if dir == "NANOHOR":
-            sigs[self._encoder.pc.data.cap_enc1_bool] = 1
+            sigs[self._encoder.pc.data.cap_enc1_bool] = 0
         elif dir == "NANOVER":
             sigs[self._encoder.pc.data.cap_enc2_bool] = 1
         elif dir == "NANOZ":

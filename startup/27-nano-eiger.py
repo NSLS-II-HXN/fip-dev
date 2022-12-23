@@ -376,8 +376,8 @@ try:
 
     eiger2.hdf5.compression.set("zlib").wait()  # If 'compression' is None, the plan will not start
 
-    source = "EIG"
-    # source = "ROI1"
+    # source = "EIG"
+    source = "ROI1"
 
     # Should be set before warmup
     eiger2.hdf5.nd_array_port.set(source).wait()
