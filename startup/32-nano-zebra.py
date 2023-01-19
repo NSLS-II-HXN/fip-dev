@@ -398,11 +398,22 @@ class SRXFlyer1Axis(Device):
         self._encoder.pc.pulse_start.put(0.0)
         self._encoder.pc.pulse_max.put(xnum)
         self._encoder.pc.pulse_step.put(pxsize)
-        # self._encoder.pc.pulse_width.put(pxsize - decrement)
-        self._encoder.pc.pulse_width.put(pxsize * 0.9)
-        # If decrement is too small, then zebra will not send individual pulses
-        # but integrate over the entire line
-        # Hopefully taken care of with decrement check above
+        # self._encoder.pc.pulse_width.put(pxsize * 0.2)
+
+        # # self._encoder.pc.pulse_width.put(pxsize - decrement)
+        # # If decrement is too small, then zebra will not send individual pulses
+        # # but integrate over the entire line
+        # # Hopefully taken care of with decrement check above
+
+        # The case when Merlin is configured to work in 'Trigger Enable' trigger mode.
+        # The numbers are picked using trial and error method and work for dwell time
+        #   up to 0.004 s (250 Hz acquistion rate).
+        velocity = pxsize / dwell
+        x_debounce = 0.0025 * velocity  # The true debounce time is 0.0016392 s
+        pulse_width = pxsize * 0.9 - x_debounce
+        if pulse_width < 0:
+            raise Exception(f"Dwell time is too small ...")
+        self._encoder.pc.pulse_width.put(pulse_width)
 
         # Arm the zebra
         self._encoder.pc.arm.put(1)

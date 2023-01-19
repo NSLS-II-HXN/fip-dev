@@ -305,7 +305,8 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
             # self.stage_sigs[self.cam.acquire_period] = 0.0066392
 
             self.stage_sigs[self.cam.image_mode] = 1  # 0 -single, 1 - multiple
-            self.stage_sigs[self.cam.trigger_mode] = 2  # 0 - internal, 2 - start rising
+            self.stage_sigs[self.cam.trigger_mode] = 1  # 0 - internal, 1 - trigger enable, 2 - start rising
+            # self.stage_sigs[self.cam.trigger_mode] = 2  # 0 - internal, 1 - trigger enable, 2 - start rising
 
             self.stats1.ts.ts_acquire.set(1).wait()
 

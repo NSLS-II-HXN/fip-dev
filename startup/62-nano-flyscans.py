@@ -129,11 +129,18 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             dpc = dets_by_name[det_name]
 
             if det_name == "merlin2":
-                acquire_period = 0.75 * dwell
-                acquire_time = 0.50 * dwell
-                acquire_time = min(acquire_time, acquire_period - 0.0016392)
-                if acquire_time <= 0:
-                    raise ValueError("Acquistion period is too small. Increase dwell time")
+                # # Settings for 'Trigger start rising' trigger mode of Merlin
+                # acquire_period = 0.75 * dwell
+                # acquire_time = 0.50 * dwell
+                # acquire_time = min(acquire_time, acquire_period - 0.0016392)
+                # if acquire_time <= 0:
+                #     raise ValueError("Acquistion period is too small. Increase dwell time")
+
+                # Settings for 'Trigger enable' mode
+                acquire_time = 0.0001
+                acquire_period = acquire_time
+                # acquire_period = acquire_time + 0.0016392
+
             elif det_name == "eiger2":
                 acquire_time = 0.9 * dwell
                 acquire_period = acquire_time
@@ -141,7 +148,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 raise ValueError(f"Unsupported detector: {det_name!r}")
 
             if det_name == "eiger2":
-                # Acquire one frame with the computed acquire time to avoid 'Invalid frame' 
+                # Acquire one frame with the computed acquire time to avoid 'Invalid frame'
                 #   errors in HDF5 plugin. This may be needed because Eiger is using
                 #  'autosummation' for longer exposure times, which may result in different
                 #  data representation for short and long exposures (just an assumption).
@@ -220,13 +227,13 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     ts_monitor_dec = ts_monitor_during_decorator
     if "merlin2" in d_names:
         roi_pv = merlin2.stats1.ts_total
-        roi_pv_force_update = merlin2.stats1.ts.ts_read_proc        
+        roi_pv_force_update = merlin2.stats1.ts.ts_read_proc
     elif "eiger2" in d_names:
         roi_pv = eiger2.stats1.ts_total
-        roi_pv_force_update = eiger2.stats1.ts.ts_read_proc        
+        roi_pv_force_update = eiger2.stats1.ts.ts_read_proc
     else:
         roi_pv = None
-        roi_pv_force_update = None        
+        roi_pv_force_update = None
         ts_monitor_dec = ts_monitor_during_decorator_disabled
 
     print(f"Ready to start the scan !!!")  ##
@@ -250,12 +257,12 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         if verbose:
             t_startfly = tic()
-            toc(t_startfly, "TIMER (STEP) - STARTING TIMER")            
-        
+            toc(t_startfly, "TIMER (STEP) - STARTING TIMER")
+
         yield from move_to_start_fly()
 
         if verbose:
-            toc(t_startfly, "TIMER (STEP) - MOTOR IS MOVED TO STARTING POINT")            
+            toc(t_startfly, "TIMER (STEP) - MOTOR IS MOVED TO STARTING POINT")
 
         x_set = row_start
         x_dial = xmotor.user_readback.get()
@@ -452,7 +459,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if verbose:
             toc(t_startfly, str='TIMER (STEP) - ZEBRA COLLECTION COMPLETED.')
 
-        # Force update of the respective PV so that all collected monitoring data for the row 
+        # Force update of the respective PV so that all collected monitoring data for the row
         #   is loaded before the plugin is reset. Otherwise data in monitoring stream will not
         #   contain last points of rows.
         if roi_pv_force_update:
@@ -560,7 +567,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 print(f'Direction = {direction}')
                 print(f'Start = {start}')
                 print(f'Stop  = {stop}')
-            
+
             yield from bps.mv(flying_zebra._encoder.pc.dir, direction)
             yield from fly_each_step(ymotor, step, start, stop)
 
