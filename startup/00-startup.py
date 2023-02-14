@@ -519,7 +519,9 @@ register_transform('RE', prefix='<')
 # -HACK- Patching set_and_wait in ophyd.device to make stage and unstage more
 # reliable
 
-_set_and_wait = ophyd.device.set_and_wait
+# _set_and_wait = ophyd.device.set_and_wait
+_set_and_wait = ophyd.utils.epics_pvs._set_and_wait
+
 
 @functools.wraps(_set_and_wait)
 def set_and_wait_again(signal, val, **kwargs):
@@ -552,7 +554,8 @@ def set_and_wait_again(signal, val, **kwargs):
 # Ivan: try a longer timeout for debugging
 #set_and_wait_again.timeout = 300
 set_and_wait_again.timeout = 1200
-ophyd.device.set_and_wait = set_and_wait_again
+# ophyd.device.set_and_wait = set_and_wait_again
+ophyd.utils.epics_pvs._set_and_wait = set_and_wait_again
 # -END HACK-
 
 
