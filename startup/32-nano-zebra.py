@@ -260,9 +260,9 @@ class SRXFlyer1Axis(Device):
         if dir == "NANOHOR":
             sigs[self._encoder.pc.data.cap_enc1_bool] = 0
         elif dir == "NANOVER":
-            sigs[self._encoder.pc.data.cap_enc2_bool] = 1
+            sigs[self._encoder.pc.data.cap_enc2_bool] = 0
         elif dir == "NANOZ":
-            sigs[self._encoder.pc.data.cap_enc3_bool] = 1
+            sigs[self._encoder.pc.data.cap_enc3_bool] = 0
         else:
             raise ValueError(f"Unknown value: dir={dir!r}")
 

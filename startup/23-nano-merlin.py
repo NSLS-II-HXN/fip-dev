@@ -280,6 +280,8 @@ class SRXMerlin(SingleTriggerV33, MerlinDetector):
     roi3 = Cpt(ROIPlugin, 'ROI3:')
     roi4 = Cpt(ROIPlugin, 'ROI4:')
 
+    image1 = Cpt(ImagePlugin, 'image1:')
+
     # def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
     #              **kwargs):
     def __init__(self, *args, **kwargs):
