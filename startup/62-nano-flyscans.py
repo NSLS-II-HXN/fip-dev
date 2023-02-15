@@ -288,7 +288,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
         print(f"Forward speed for the fast axis: {v} (xnum={xnum} dwell={dwell})")
         yield from mv(xmotor.velocity, v)
-
+        print(f"Finished ...")  ##
         if verbose:
             toc(t_startfly, str='TIMER (STEP) - FORWARD VELOCITY IS SET')
 
