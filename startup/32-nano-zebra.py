@@ -378,6 +378,7 @@ class SRXFlyer1Axis(Device):
         print(f"Kickoff: xstart={xstart} xtop={xstop} dwell={dwell}")
 
         self._data_exporter.set_fixed_positions()
+        self._data_exporter.set_fast_axis_parameters(fast_start=xstart, fast_stop=xstop, fast_n=xnum)
 
         dets_by_name = {d.name: d for d in self.detectors}
 
@@ -632,6 +633,11 @@ class ExportNanoZebraData:
         self._sy_fixed = get_position(nano_stage.sy)
         self._sz_fixed = get_position(nano_stage.sz)
 
+    def set_fast_axis_parameters(self, fast_start, fast_stop, fast_n):
+        self._fast_start = fast_start
+        self._fast_stop = fast_stop
+        self._fast_n = fast_n
+
     def export(self, zebra, fastaxis):
         j = 0
         while zebra.pc.data_in_progress.get() == 1:
@@ -649,30 +655,35 @@ class ExportNanoZebraData:
         print(f"Loading from Zebra: time")
         time_d = zebra.pc.data.time.get()
 
+        fast_axis_data = np.linspace(self._fast_start, self._fast_stop, self._fast_n)
+
         if fastaxis == "NANOHOR":
-            enc1_d = zebra.pc.data.enc1.get()
+            fast_axis_collected = nanoZebra.pc.data.cap_enc1_bool.get()
+            enc1_d = zebra.pc.data.enc1.get() if fast_axis_collected else fast_axis_data
             enc2_d = [self._sy_fixed] * len(enc1_d)
             enc3_d = [self._sz_fixed] * len(enc1_d)
         elif fastaxis == "NANOVER":
-            enc2_d = zebra.pc.data.enc2.get()
+            fast_axis_collected = nanoZebra.pc.data.cap_enc2_bool.get()
+            enc2_d = zebra.pc.data.enc2.get() if fast_axis_collected else fast_axis_data
             enc1_d = [self._sx_fixed] * len(enc2_d)
             enc3_d = [self._sz_fixed] * len(enc2_d)
         elif fastaxis == "NANOZ":
-            enc3_d = zebra.pc.data.enc3.get()
+            fast_axis_collected = nanoZebra.pc.data.cap_enc3_bool.get()
+            enc3_d = zebra.pc.data.enc3.get() if fast_axis_collected else fast_axis_data
             enc1_d = [self._sx_fixed] * len(enc3_d)
             enc2_d = [self._sy_fixed] * len(enc3_d)
         else:
             raise Exception(f"Unknown value for 'fastaxis': {fastaxis!r}")
 
         # Correction for the encoder values so that they represent the centers of the bins
-        if encoder.lower() == "enc1":
-            enc1_d += pxsize / 2
-        elif encoder.lower() == "enc2":
-            enc2_d += pxsize / 2
-        elif encoder.lower() == "enc3":
-            enc3_d += pxsize / 2
-        else:
-            print(f"Unrecognized encoder name: {encoder}")
+        # if encoder.lower() == "enc1":
+        #     enc1_d += pxsize / 2
+        # elif encoder.lower() == "enc2":
+        #     enc2_d += pxsize / 2
+        # elif encoder.lower() == "enc3":
+        #     enc3_d += pxsize / 2
+        # else:
+        #     print(f"Unrecognized encoder name: {encoder}")
 
         print(f"===================================================")
         print(f"COLLECTED DATA:")
