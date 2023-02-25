@@ -342,7 +342,7 @@ class SRXFlyer1Axis(Device):
         if self._sis is not None:
             sis_mca_names = self._sis_mca_names()
             self._data_sis_exporter.open(
-                self.__write_filepath_sis, sis_mca_names=sis_mca_names, ion=self._sis, zebra=self._encoder
+                self.__write_filepath_sis, mca_names=sis_mca_names, ion=self._sis, zebra=self._encoder
             )
 
         super().stage()
@@ -879,42 +879,42 @@ class ExportSISData:
 
 
 
-def export_sis_data(ion, mca_names, filepath, zebra):
-    print(f"EXPORTING SIS DATA .................................")
-    N = ion.nuse_all.get()
+# def export_sis_data(ion, mca_names, filepath, zebra):
+#     print(f"EXPORTING SIS DATA .................................")
+#     N = ion.nuse_all.get()
 
-    n_mcas = len(mca_names)
+#     n_mcas = len(mca_names)
 
-    print("Step1")
-    mca_data = []
-    for n in range(1, n_mcas + 1):
-        mca = ion.mca_by_index[n].spectrum.get(timeout=5.0)
-        mca_data.append(mca)
+#     print("Step1")
+#     mca_data = []
+#     for n in range(1, n_mcas + 1):
+#         mca = ion.mca_by_index[n].spectrum.get(timeout=5.0)
+#         mca_data.append(mca)
 
-    print("Step2")
-    correct_length = int(zebra.pc.data.num_down.get())
+#     print("Step2")
+#     correct_length = int(zebra.pc.data.num_down.get())
 
-    print(f"File name: {filepath!r}")
+#     print(f"File name: {filepath!r}")
 
-    with h5py.File(filepath, "w") as f:
-        print("Step3")
-        for n in range(len(mca_data)):
-            mca = mca_data[n]
-            mca = mca[1::2]
-            if len(mca) != correct_length:
-                print(f"Incorrect number of points ({len(mca)}) loaded from MCA{n + 1}: {correct_length} points are expected")
-                if len(mca > correct_length):
-                    mca = mca[:correct_length]
-                else:
-                    mca = np.append(mca, [1e10] * (correct_length - len(mca)))
-            mca_data[n] = mca
+#     with h5py.File(filepath, "w") as f:
+#         print("Step3")
+#         for n in range(len(mca_data)):
+#             mca = mca_data[n]
+#             mca = mca[1::2]
+#             if len(mca) != correct_length:
+#                 print(f"Incorrect number of points ({len(mca)}) loaded from MCA{n + 1}: {correct_length} points are expected")
+#                 if len(mca > correct_length):
+#                     mca = mca[:correct_length]
+#                 else:
+#                     mca = np.append(mca, [1e10] * (correct_length - len(mca)))
+#             mca_data[n] = mca
 
-        print("Step4")
-        for n, name in enumerate(mca_names):
-            dset = f.create_dataset(name, (correct_length,), dtype="f")
-            dset[...] = np.asarray(mca_data[n])
+#         print("Step4")
+#         for n, name in enumerate(mca_names):
+#             dset = f.create_dataset(name, (correct_length,), dtype="f")
+#             dset[...] = np.asarray(mca_data[n])
 
-    print(f"FINISHED EXPORTING SCALER DATA")
+#     print(f"FINISHED EXPORTING SCALER DATA")
 
 
 try:
