@@ -16,8 +16,8 @@ from ophyd.areadetector.filestore_mixins import resource_factory
 
 
 xs = None  # No Xspress3
-# use_sclr1 = False  # Set this False to run zebra without 'sclr1'
-use_sclr1 = True
+use_sclr1 = False  # Set this False to run zebra without 'sclr1'
+# use_sclr1 = True
 
 
 class ZebraHDF5Handler(HandlerBase):
