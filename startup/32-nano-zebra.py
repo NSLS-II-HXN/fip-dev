@@ -238,6 +238,8 @@ class SRXFlyer1Axis(Device):
         self.frame_per_point = None
 
         self._data_exporter = ExportNanoZebraData()
+        if self._sis is not None:
+            self._data_sis_exporter = ExportSISData()
 
     def _select_captured_data(self):
         """
@@ -337,12 +339,19 @@ class SRXFlyer1Axis(Device):
         self._document_cache.extend(("resource", _) for _ in resources)
 
         self._data_exporter.open(self.__write_filepath)
+        if self._sis is not None:
+            sis_mca_names = self._sis_mca_names()
+            self._data_sis_exporter.open(
+                self.__write_filepath_sis, sis_mca_names=sis_mca_names, ion=self._sis, zebra=self._encoder
+            )
 
         super().stage()
 
     def unstage(self):
         self._point_counter = None
         self._data_exporter.close()
+        if self._sis is not None:
+            self._data_sis_exporter.close()
         super().unstage()
 
     def describe_collect(self):
@@ -500,9 +509,11 @@ class SRXFlyer1Axis(Device):
         def get_sis_data():
             if self._sis is None:
                 return
-            export_sis_data(
-                self._sis, sis_mca_names, self.__write_filepath_sis, self._encoder
-            )
+            self._data_sis_exporter.export()
+
+            # export_sis_data(
+            #     self._sis, sis_mca_names, self.__write_filepath_sis, self._encoder
+            # )
 
         if amk_debug_flag:
             t_sisdata = tic()
@@ -753,7 +764,7 @@ class ExportSISData:
     def __del__(self):
         self.close()
 
-    def export(self, zebra, fastaxis):
+    def export(self):
 
         n_mcas = len(self._mca_names)
 
@@ -764,7 +775,7 @@ class ExportSISData:
             mca_data.append(mca)
 
         print("Step2")
-        correct_length = int(zebra.pc.data.num_down.get())
+        correct_length = int(self._zebra.pc.data.num_down.get())
 
         for n in range(len(mca_data)):
             mca = mca_data[n]
@@ -779,7 +790,7 @@ class ExportSISData:
 
         print("Step3")
         j = 0
-        while zebra.pc.data_in_progress.get() == 1:
+        while self._zebra.pc.data_in_progress.get() == 1:
             print("Waiting for zebra...")
             ttime.sleep(0.1)
             j += 1
@@ -791,10 +802,10 @@ class ExportSISData:
         def add_data(ds_name, data):
             ds = self._fp[ds_name]
             n_ds = ds.shape[0]
-            ds.resize((n_ds + n_new_pts,))
+            ds.resize((n_ds + len(data),))
             ds[n_ds:] = np.array(data)
 
-        for n, name in enumerate(mca_names):
+        for n, name in enumerate(self._mca_names):
             add_data(name, np.asarray(mca_data[n]))
 
         self._fp.flush()
