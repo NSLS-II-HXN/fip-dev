@@ -324,7 +324,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         ion = flying_zebra.sclr
         if ion:
-            yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
+            yield from abs_set(ion.nuse_all, xnum, wait=True)
+            #yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         if verbose:
             toc(t_startfly, str='TIMER (STEP) - DETECTORS ARE CONFIGURED')

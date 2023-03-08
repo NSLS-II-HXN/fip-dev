@@ -16,8 +16,8 @@ from ophyd.areadetector.filestore_mixins import resource_factory
 
 
 xs = None  # No Xspress3
-use_sclr1 = False  # Set this False to run zebra without 'sclr1'
-# use_sclr1 = True
+# use_sclr1 = False  # Set this False to run zebra without 'sclr1'
+use_sclr1 = True
 
 
 class ZebraHDF5Handler(HandlerBase):
@@ -223,9 +223,14 @@ class SRXFlyer1Axis(Device):
         # This is for the merlin
         self.stage_sigs[self._encoder.output1.ttl.addr] = 31
 
+        # Scaler
+        self.stage_sigs[self._encoder.output2.ttl.addr] = 31
+        self.stage_sigs[self._encoder.output3.ttl.addr] = 31
+
         if self._sis is not None:
             # Put SIS3820 into single count (not autocount) mode
-            # self.stage_sigs[self._sis.count_mode] = 0
+            self.stage_sigs[self._sis.count_mode] = 0
+            self.stage_sigs[self._sis.count_on_start] = 1
             # Stop the SIS3820
             self._sis.stop_all.put(1)
 
@@ -768,18 +773,17 @@ class ExportSISData:
 
         n_mcas = len(self._mca_names)
 
-        print("Step1")
         mca_data = []
         for n in range(1, n_mcas + 1):
             mca = self._ion.mca_by_index[n].spectrum.get(timeout=5.0)
             mca_data.append(mca)
 
-        print("Step2")
         correct_length = int(self._zebra.pc.data.num_down.get())
 
         for n in range(len(mca_data)):
             mca = mca_data[n]
-            mca = mca[1::2]
+            # print(f"Number of mca points: {len(mca)}")
+            # mca = mca[1::2]
             if len(mca) != correct_length:
                 print(f"Incorrect number of points ({len(mca)}) loaded from MCA{n + 1}: {correct_length} points are expected")
                 if len(mca > correct_length):
@@ -788,7 +792,6 @@ class ExportSISData:
                     mca = np.append(mca, [1e10] * (correct_length - len(mca)))
             mca_data[n] = mca
 
-        print("Step3")
         j = 0
         while self._zebra.pc.data_in_progress.get() == 1:
             print("Waiting for zebra...")
@@ -798,7 +801,6 @@ class ExportSISData:
                 print("THE ZEBRA IS BEHAVING BADLY CARRYING ON")
                 break
 
-        print("Step4")
         def add_data(ds_name, data):
             ds = self._fp[ds_name]
             n_ds = ds.shape[0]
@@ -809,112 +811,6 @@ class ExportSISData:
             add_data(name, np.asarray(mca_data[n]))
 
         self._fp.flush()
-
-
-        # pxsize = zebra.pc.pulse_step.get()  # Pixel size
-        # encoder = zebra.pc.enc.get(as_string=True)  # Encoder ('Enc1', 'Enc2' or 'Enc3')
-
-        # print(f"Loading from Zebra: time")
-        # time_d = zebra.pc.data.time.get()
-
-        # if fastaxis == "NANOHOR":
-        #     enc1_d = zebra.pc.data.enc1.get()
-        #     enc2_d = [self._sy_fixed] * len(enc1_d)
-        #     enc3_d = [self._sz_fixed] * len(enc1_d)
-        # elif fastaxis == "NANOVER":
-        #     enc2_d = zebra.pc.data.enc2.get()
-        #     enc1_d = [self._sx_fixed] * len(enc2_d)
-        #     enc3_d = [self._sz_fixed] * len(enc2_d)
-        # elif fastaxis == "NANOZ":
-        #     enc3_d = zebra.pc.data.enc3.get()
-        #     enc1_d = [self._sx_fixed] * len(enc3_d)
-        #     enc2_d = [self._sy_fixed] * len(enc3_d)
-        # else:
-        #     raise Exception(f"Unknown value for 'fastaxis': {fastaxis!r}")
-
-        # # Correction for the encoder values so that they represent the centers of the bins
-        # if encoder.lower() == "enc1":
-        #     enc1_d += pxsize / 2
-        # elif encoder.lower() == "enc2":
-        #     enc2_d += pxsize / 2
-        # elif encoder.lower() == "enc3":
-        #     enc3_d += pxsize / 2
-        # else:
-        #     print(f"Unrecognized encoder name: {encoder}")
-
-        # print(f"===================================================")
-        # print(f"COLLECTED DATA:")
-        # print(f"time_d={time_d}")
-        # print(f"enc1_d={enc1_d}")
-        # print(f"enc2_d={enc2_d}")
-        # print(f"enc3_d={enc3_d}")
-        # print(f"===================================================")
-
-        # px = zebra.pc.pulse_step.get()
-        # if fastaxis == 'NANOHOR':
-        #     # Add half pixelsize to correct encoder
-        #     enc1_d = enc1_d + (px / 2)
-        # elif fastaxis == 'NANOVER':
-        #     # Add half pixelsize to correct encoder
-        #     enc2_d = enc2_d + (px / 2)
-        # elif fastaxis == 'NANOZ':
-        #     # Add half pixelsize to correct encoder
-        #     enc3_d = enc3_d + (px / 2)
-
-
-        # n_new_pts = len(time_d)
-
-        # def add_data(ds_name, data):
-        #     ds = self._fp[ds_name]
-        #     n_ds = ds.shape[0]
-        #     ds.resize((n_ds + n_new_pts,))
-        #     ds[n_ds:] = np.array(data)
-
-        # add_data("time", time_d)
-        # add_data("enc1", enc1_d)
-        # add_data("enc2", enc2_d)
-        # add_data("enc3", enc3_d)
-
-        # self._fp.flush()
-
-
-
-# def export_sis_data(ion, mca_names, filepath, zebra):
-#     print(f"EXPORTING SIS DATA .................................")
-#     N = ion.nuse_all.get()
-
-#     n_mcas = len(mca_names)
-
-#     print("Step1")
-#     mca_data = []
-#     for n in range(1, n_mcas + 1):
-#         mca = ion.mca_by_index[n].spectrum.get(timeout=5.0)
-#         mca_data.append(mca)
-
-#     print("Step2")
-#     correct_length = int(zebra.pc.data.num_down.get())
-
-#     print(f"File name: {filepath!r}")
-
-#     with h5py.File(filepath, "w") as f:
-#         print("Step3")
-#         for n in range(len(mca_data)):
-#             mca = mca_data[n]
-#             mca = mca[1::2]
-#             if len(mca) != correct_length:
-#                 print(f"Incorrect number of points ({len(mca)}) loaded from MCA{n + 1}: {correct_length} points are expected")
-#                 if len(mca > correct_length):
-#                     mca = mca[:correct_length]
-#                 else:
-#                     mca = np.append(mca, [1e10] * (correct_length - len(mca)))
-#             mca_data[n] = mca
-
-#         print("Step4")
-#         for n, name in enumerate(mca_names):
-#             dset = f.create_dataset(name, (correct_length,), dtype="f")
-#             dset[...] = np.asarray(mca_data[n])
-
-#     print(f"FINISHED EXPORTING SCALER DATA")
 
 
 try:
