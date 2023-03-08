@@ -115,8 +115,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     detectors_stage_once = [_ for _ in flying_zebra.detectors if _.name in names_stage_once]
     detectors_stage_every_row = [_ for _ in flying_zebra.detectors if _.name not in names_stage_once]
 
-    print(f"detectors_stage_once={detectors_stage_once}")
-    print(f"detectors_stage_every_row={detectors_stage_every_row}")
+    # print(f"detectors_stage_once={detectors_stage_once}")
+    # print(f"detectors_stage_every_row={detectors_stage_every_row}")
 
     dets_by_name = {d.name : d
                     for d in detectors}
@@ -211,6 +211,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     md['scan']['snake'] = snake
     md['scan']['shape'] = (xnum, ynum)
 
+    time_start_scan = time.time()
+
     # Synchronize encoders
     # flying_zebra._encoder.pc.enc_pos1_sync.put(1)
     # flying_zebra._encoder.pc.enc_pos2_sync.put(1)
@@ -236,7 +238,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         roi_pv_force_update = None
         ts_monitor_dec = ts_monitor_during_decorator_disabled
 
-    print(f"Ready to start the scan !!!")  ##
+    # print(f"Ready to start the scan !!!")  ##
 
     # @stage_decorator(flying_zebra.detectors)
     @stage_decorator(detectors_stage_every_row)
@@ -244,7 +246,7 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         def move_to_start_fly():
             "See http://nsls-ii.github.io/bluesky/plans.html#the-per-step-hook"
 
-            print(f"Start moving to beginning of the row")
+            # print(f"Start moving to beginning of the row")
             row_mv_to_start = short_uid('row')
             yield from bps.checkpoint()
             yield from reset_scanner_velocity()
@@ -252,8 +254,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
             yield from bps.abs_set(motor, step, group=row_mv_to_start)
             yield from bps.wait(group=row_mv_to_start)
             # yield from bps.trigger_and_read([temp_nanoKB, motor])  ## Uncomment this
-            print(f"Finished moving to the beginning of the row")
-            print(f"Fast axis: {xmotor.read()} Slow axis: {motor.read()}")
+            # print(f"Finished moving to the beginning of the row")
+            # print(f"Fast axis: {xmotor.read()} Slow axis: {motor.read()}")
 
         if verbose:
             t_startfly = tic()
@@ -286,9 +288,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         # Set the scan speed
         v = ((xstop - xstart) / (xnum - 1)) / dwell  # compute "stage speed"
-        print(f"Forward speed for the fast axis: {v} (xnum={xnum} dwell={dwell})")
+        if verbose:
+            print(f"FORWARD SPEED FOR FAST AXIS: {v} (xnum={xnum} dwell={dwell})")
         yield from mv(xmotor.velocity, v)
-        print(f"Finished ...")  ##
         if verbose:
             toc(t_startfly, str='TIMER (STEP) - FORWARD VELOCITY IS SET')
 
@@ -313,11 +315,11 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
         # # Merlin code from the original SRX plan
         if "merlin2" in dets_by_name:
-            print(f"Configuring 'merlin2' ...")
+            # print(f"Configuring 'merlin2' ...")
             dpc = dets_by_name["merlin2"]
             yield from abs_set(dpc.cam.num_images, xnum, wait=True)
         if "eiger2" in dets_by_name:
-            print(f"Configuring 'eiger2' ...")
+            # print(f"Configuring 'eiger2' ...")
             dpc = dets_by_name["eiger2"]
             yield from abs_set(dpc.cam.num_triggers, xnum, wait=True)
             yield from abs_set(dpc.cam.num_images, 1, wait=True)
@@ -375,7 +377,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                     # print("Waiting for detector state")
                     # yield from bps.sleep(0.001)
                 yield from bps.sleep(0.2)
-                toc(t_wait_detector, str=f'  waiting for detector {d.name!r}')
+                if verbose:
+                    toc(t_wait_detector, str=f'  waiting for detector {d.name!r}')
 
         if roi_pv_force_update:
             yield from bps.mv(roi_pv_force_update, 1)
@@ -418,9 +421,11 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         #     toc(t_startfly, str='Total time: Motor stopped')
 
         # wait for the motor and detectors to all agree they are done
-        print("Waiting for the row scan to complete ...")
+        if verbose:
+            print("Waiting for the row scan to complete ...")
         yield from bps.wait(group=row_scan)
-        print("Row scan is completed")
+        if verbose:
+            print("Row scan is completed")
 
         # yield from bps.sleep(1)
 
@@ -431,10 +436,10 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if ion:
             yield from abs_set(ion.stop_all, 1)  # stop acquiring scaler
 
-        print(f"Resetting scanner velocity")
+        # print(f"Resetting scanner velocity")
         # set speed back
         yield from reset_scanner_velocity()
-        print(f"Completed resetting scanner velocity")
+        # print(f"Completed resetting scanner velocity")
 
         # @timer_wrapper
         def zebra_complete():
@@ -469,7 +474,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
         if verbose:
             toc(t_startfly, str='TIMER (STEP) - STEP COMPLETED.')
 
-        print(f"Step is completed")
+        if verbose:
+            print(f"Step is completed")
 
     def at_scan(name, doc):
         # scanrecord.current_scan.put(doc['uid'][:6])
@@ -530,8 +536,9 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     @stage_decorator([flying_zebra] + detectors_stage_once)  # Below, 'scan' stage ymotor.
     @run_decorator(md=md)
     def plan():
-        print("Starting the plan ...")
-        print(f"flying_zebra.detectors={flying_zebra.detectors}")
+        if verbose:
+            print("Starting the plan ...")
+            print(f"flying_zebra.detectors={flying_zebra.detectors}")
 
         # print(f"Plan start (enc1): {flying_zebra._encoder.pc.data.cap_enc1_bool.get()}")
         # print(f"Plan start (enc2): {flying_zebra._encoder.pc.data.cap_enc2_bool.get()}")
@@ -542,9 +549,12 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                 yield from bps.mov(d.total_points, xnum)
 
         ystep = 0
-        for step in np.linspace(ystart, ystop, ynum):
+        for n_row, step in enumerate(np.linspace(ystart, ystop, ynum)):
 
-            print(f"Starting the next row")
+            print(f"Scanning row #{n_row + 1} (of {ynum}): Y={step:.3f}")
+
+            if verbose:
+                print(f"Starting the next row")
             for d in detectors_stage_every_row:
                 # if d and (d.name != "merlin2"):
                 if d:
@@ -593,6 +603,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
     # Run the scan
     uid = yield from final_plan
 
+    print(f"SCAN TOTAL TIME: {time.time() - time_start_scan}")
+
     return uid
 
 def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
@@ -600,9 +612,9 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     kwargs.setdefault('xmotor', nano_stage.sx)
     kwargs.setdefault('ymotor', nano_stage.sy)
     kwargs.setdefault('flying_zebra', nano_flying_zebra)
-    print(kwargs['xmotor'].name)
-    print(kwargs['ymotor'].name)
-    print(kwargs['flying_zebra'].name)
+    # print(kwargs['xmotor'].name)
+    # print(kwargs['ymotor'].name)
+    # print(kwargs['flying_zebra'].name)
     yield from abs_set(nano_flying_zebra.fast_axis, 'NANOHOR')
     yield from abs_set(nano_flying_zebra.slow_axis, 'NANOVER')
 
@@ -611,7 +623,7 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
         extra_dets = []
     dets = [] if  _xs is None else [_xs]
     dets = dets + extra_dets
-    print(f"dets={dets}")
+    # print(f"dets={dets}")
     print('Scan starting. Centering the scanner...')
     # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
     yield from bps.sleep(2)
@@ -633,9 +645,9 @@ def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):
     kwargs.setdefault('xmotor', nano_stage.sy)
     kwargs.setdefault('ymotor', nano_stage.sx)
     kwargs.setdefault('flying_zebra', nano_flying_zebra)
-    print(kwargs['xmotor'].name)
-    print(kwargs['ymotor'].name)
-    print(kwargs['flying_zebra'].name)
+    # print(kwargs['xmotor'].name)
+    # print(kwargs['ymotor'].name)
+    # print(kwargs['flying_zebra'].name)
     yield from abs_set(nano_flying_zebra.fast_axis, 'NANOVER')
     yield from abs_set(nano_flying_zebra.slow_axis, 'NANOHOR')
 
@@ -645,7 +657,7 @@ def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):
     #dets = [_xs] + extra_dets
     dets = [] if  _xs is None else [_xs]
     dets = dets + extra_dets
-    print(f"dets={dets}")
+    # print(f"dets={dets}")
     print('Scan starting. Centering the scanner...')
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
@@ -663,9 +675,9 @@ def nano_z_scan_and_fly(*args, extra_dets=None, **kwargs):
     kwargs.setdefault('xmotor', nano_stage.sz)
     kwargs.setdefault('ymotor', nano_stage.sx)
     kwargs.setdefault('flying_zebra', nano_flying_zebra)
-    print(kwargs['xmotor'].name)
-    print(kwargs['ymotor'].name)
-    print(kwargs['flying_zebra'].name)
+    # print(kwargs['xmotor'].name)
+    # print(kwargs['ymotor'].name)
+    # print(kwargs['flying_zebra'].name)
     yield from abs_set(nano_flying_zebra.fast_axis, 'NANOZ')
     yield from abs_set(nano_flying_zebra.slow_axis, 'NANOHOR')
 
@@ -674,7 +686,7 @@ def nano_z_scan_and_fly(*args, extra_dets=None, **kwargs):
         extra_dets = []
     dets = [_xs] + extra_dets
     dets = [] if  _xs is None else [_xs]
-    print(f"dets={dets}")
+    # print(f"dets={dets}")
     print('Scan starting. Centering the scanner...')
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)

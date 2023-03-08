@@ -16,8 +16,8 @@ from ophyd.areadetector.filestore_mixins import resource_factory
 
 
 xs = None  # No Xspress3
-# use_sclr1 = False  # Set this False to run zebra without 'sclr1'
-use_sclr1 = True
+use_sclr1 = False  # Set this False to run zebra without 'sclr1'
+# use_sclr1 = True
 
 
 class ZebraHDF5Handler(HandlerBase):
@@ -306,7 +306,7 @@ class SRXFlyer1Axis(Device):
         else:
             raise ValueError(f"Unknown value: dir={dir!r}")
 
-        print(f"stage_sigs={self.stage_sigs}") ##
+        # print(f"stage_sigs={self.stage_sigs}") ##
 
         self.__filename = "{}.h5".format(uuid.uuid4())
         self.__filename_sis = "{}.h5".format(uuid.uuid4())
@@ -389,7 +389,7 @@ class SRXFlyer1Axis(Device):
         return {"primary": desc}
 
     def kickoff(self, *, xstart, xstop, xnum, dwell):
-        print(f"Kickoff: xstart={xstart} xtop={xstop} dwell={dwell}")
+        # print(f"Kickoff: xstart={xstart} xtop={xstop} dwell={dwell}")
 
         self._data_exporter.set_fixed_positions()
         self._data_exporter.set_fast_axis_parameters(fast_start=xstart, fast_stop=xstop, fast_n=xnum)
@@ -409,8 +409,8 @@ class SRXFlyer1Axis(Device):
         decrement = (pxsize / dwell) * 0.0005
         decrement = max(decrement, 1e-5)
 
-        print(f"gate_start={xstart - direction * (pxsize/2)}")
-        print(f"extent={extent}")
+        # print(f"gate_start={xstart - direction * (pxsize/2)}")
+        # print(f"extent={extent}")
         self._encoder.pc.gate_start.put(xstart - direction * (pxsize / 2))
         self._encoder.pc.gate_step.put(extent + 0.060)
         self._encoder.pc.gate_width.put(extent + 0.050)
@@ -454,23 +454,23 @@ class SRXFlyer1Axis(Device):
 
         amk_debug_flag = False
 
-        print(f"Complete 1")
+        # print(f"Complete 1")
         # Our acquisition complete PV is: XF:05IDD-ES:1{Dev:Zebra1}:ARRAY_ACQ
         while self._encoder.pc.data_in_progress.get() == 1:
             ttime.sleep(0.01)
-        print(f"Complete 2")
+        # print(f"Complete 2")
         # ttime.sleep(.1)
         self._mode = "complete"
         self._encoder.pc.block_state_reset.put(1)
         # see triggering errors of the xspress3 on suspension.  This is
         # to test the reset of the xspress3 after a line.
 
-        print(f"Complete 3")
+        # print(f"Complete 3")
 
         for d in self._dets:
             d.stop(success=True)
 
-        print(f"Complete 4")
+        # print(f"Complete 4")
 
         time_datum = self._datum_factory_z({"column": "time", "point_number": self._point_counter})
         enc1_datum = self._datum_factory_z({"column": "enc1", "point_number": self._point_counter})
@@ -668,7 +668,6 @@ class ExportNanoZebraData:
         pxsize = zebra.pc.pulse_step.get()  # Pixel size
         encoder = zebra.pc.enc.get(as_string=True)  # Encoder ('Enc1', 'Enc2' or 'Enc3')
 
-        print(f"Loading from Zebra: time")
         time_d = zebra.pc.data.time.get()
 
         fast_axis_data = np.linspace(self._fast_start, self._fast_stop, self._fast_n)
@@ -701,13 +700,13 @@ class ExportNanoZebraData:
         # else:
         #     print(f"Unrecognized encoder name: {encoder}")
 
-        print(f"===================================================")
-        print(f"COLLECTED DATA:")
-        print(f"time_d={time_d}")
-        print(f"enc1_d={enc1_d}")
-        print(f"enc2_d={enc2_d}")
-        print(f"enc3_d={enc3_d}")
-        print(f"===================================================")
+        # print(f"===================================================")
+        # print(f"COLLECTED DATA:")
+        # print(f"time_d={time_d}")
+        # print(f"enc1_d={enc1_d}")
+        # print(f"enc2_d={enc2_d}")
+        # print(f"enc3_d={enc3_d}")
+        # print(f"===================================================")
 
         px = zebra.pc.pulse_step.get()
         if fastaxis == 'NANOHOR':
