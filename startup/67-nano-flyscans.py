@@ -190,7 +190,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
     # This is added for consistency with existing HXN plans. Requires custom
     #   setup of RE:   hxntools.scans.setup(RE=RE)
-    # yield Msg('hxn_next_scan_id')
+    if not FIP_TESTING:
+        yield Msg('hxn_next_scan_id')
 
     if "scan" not in md:
         md["scan"] = {}
@@ -204,8 +205,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
                                'units' : xmotor.motor_egu.get()}
     md['scan']['slow_axis'] = {'motor_name' : ymotor.name,
                                'units' : ymotor.motor_egu.get()}
-    # md['scan']['theta'] = {'val' : nano_stage.th.user_readback.get(),
-    #                        'units' : nano_stage.th.motor_egu.get()}
+    # md['scan']['theta'] = {'val' : pt_tomo.th.user_readback.get(),
+    #                        'units' : pt_tomo.th.motor_egu.get()}
     md['scan']['delta'] = {'val' : delta,
                            'units' : xmotor.motor_egu.get()}
     md['scan']['snake'] = snake
@@ -609,8 +610,8 @@ def scan_and_fly_base(detectors, xstart, xstop, xnum, ystart, ystop, ynum, dwell
 
 def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     # RE(nano_scan_and_fly(-10, 10, 21, -1, 1, 5, 0.1, verbose=True))
-    kwargs.setdefault('xmotor', nano_stage.sx)
-    kwargs.setdefault('ymotor', nano_stage.sy)
+    kwargs.setdefault('xmotor', pt_tomo.ssx)
+    kwargs.setdefault('ymotor', pt_tomo.ssy)
     kwargs.setdefault('flying_zebra', nano_flying_zebra)
     # print(kwargs['xmotor'].name)
     # print(kwargs['ymotor'].name)
@@ -625,7 +626,7 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     dets = dets + extra_dets
     # print(f"dets={dets}")
     print('Scan starting. Centering the scanner...')
-    # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
+    # yield from mv(pt_tomo.ssx, 0, pt_tomo.ssy, 0, pt_tomo.ssz, 0)
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
@@ -633,17 +634,17 @@ def nano_scan_and_fly(*args, extra_dets=None, **kwargs):
     yield from set_scanner_velocity(30)
     # yield from bps.sleep(1)
     # print("Centering X-axis ...")
-    # yield from mv(nano_stage.sx, 0)
+    # yield from mv(pt_tomo.ssx, 0)
     # print("Centering Y-axis ...")
-    # yield from mv(nano_stage.sy, 0)
+    # yield from mv(pt_tomo.ssy, 0)
     # print("Centering Z-axis ...")
-    # yield from mv(nano_stage.sz, 0)
+    # yield from mv(pt_tomo.ssz, 0)
     # yield from bps.sleep(2)
 
 
 def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):
-    kwargs.setdefault('xmotor', nano_stage.sy)
-    kwargs.setdefault('ymotor', nano_stage.sx)
+    kwargs.setdefault('xmotor', pt_tomo.ssy)
+    kwargs.setdefault('ymotor', pt_tomo.ssx)
     kwargs.setdefault('flying_zebra', nano_flying_zebra)
     # print(kwargs['xmotor'].name)
     # print(kwargs['ymotor'].name)
@@ -662,18 +663,18 @@ def nano_y_scan_and_fly(*args, extra_dets=None, **kwargs):
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
-    #yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-    #yield from mv(nano_stage.sx, 0, nano_stage.sy, 0)
+    #yield from mv(pt_tomo.ssx, 0, pt_tomo.ssy, 0, pt_tomo.ssz, 0)
+    #yield from mv(pt_tomo.ssx, 0, pt_tomo.ssy, 0)
     #yield from bps.sleep(2)
 
-    # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
+    # yield from mv(pt_tomo.ssx, 0, pt_tomo.ssy, 0, pt_tomo.ssz, 0)
 
     set_scanner_velocity(30)
 
 
 def nano_z_scan_and_fly(*args, extra_dets=None, **kwargs):
-    kwargs.setdefault('xmotor', nano_stage.sz)
-    kwargs.setdefault('ymotor', nano_stage.sx)
+    kwargs.setdefault('xmotor', pt_tomo.ssz)
+    kwargs.setdefault('ymotor', pt_tomo.ssx)
     kwargs.setdefault('flying_zebra', nano_flying_zebra)
     # print(kwargs['xmotor'].name)
     # print(kwargs['ymotor'].name)
@@ -691,5 +692,5 @@ def nano_z_scan_and_fly(*args, extra_dets=None, **kwargs):
     yield from bps.sleep(2)
     yield from scan_and_fly_base(dets, *args, **kwargs)
     print('Scan finished. Centering the scanner...')
-    yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
-    # yield from mv(nano_stage.sx, 0, nano_stage.sy, 0, nano_stage.sz, 0)
+    yield from mv(pt_tomo.ssx, 0, pt_tomo.ssy, 0, pt_tomo.ssz, 0)
+    # yield from mv(pt_tomo.ssx, 0, pt_tomo.ssy, 0, pt_tomo.ssz, 0)

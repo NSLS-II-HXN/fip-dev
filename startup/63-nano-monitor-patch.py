@@ -1,3 +1,5 @@
+print(f"Loading {__file__}...")
+
 from bluesky.utils import new_uid, short_uid, make_decorator
 from bluesky.preprocessors import single_gen, ensure_generator, plan_mutator
 from bluesky.run_engine import IllegalMessageSequence, Msg

@@ -645,9 +645,9 @@ class ExportNanoZebraData:
             else:
                 return 0
 
-        self._sx_fixed = get_position(nano_stage.sx)
-        self._sy_fixed = get_position(nano_stage.sy)
-        self._sz_fixed = get_position(nano_stage.sz)
+        self._sx_fixed = get_position(pt_tomo.ssx)
+        self._sy_fixed = get_position(pt_tomo.ssy)
+        self._sz_fixed = get_position(pt_tomo.ssz)
 
     def set_fast_axis_parameters(self, fast_start, fast_stop, fast_n):
         self._fast_start = fast_start

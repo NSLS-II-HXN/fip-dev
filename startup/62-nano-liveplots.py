@@ -1,3 +1,5 @@
+print(f"Loading {__file__}...")
+
 from bluesky.callbacks.mpl_plotting import LivePlot, QtAwareCallback
 from functools import partial
 import matplotlib.pyplot as plt
